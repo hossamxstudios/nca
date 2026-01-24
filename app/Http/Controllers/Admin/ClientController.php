@@ -125,16 +125,12 @@ class ClientController extends Controller
             ->where('subject_id', $client->id)
             ->where('created_at', '>=', now()->subMinutes(3))
             ->exists();
-
         if (!$recentView) {
             ActivityLogger::viewed($client, ActivityLog::GROUP_CLIENTS);
         }
-
         $items = Item::orderBy('order')->get();
-
         return view('admin.clients.show', compact('client', 'items'));
     }
-
 
     public function store(StoreClientRequest $request)
     {
