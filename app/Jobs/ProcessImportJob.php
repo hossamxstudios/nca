@@ -44,15 +44,23 @@ class ProcessImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        try {
-            // Log::info("ProcessImportJob started for import ID: {$this->import->id}");
+        // Increase limits for large imports
+        set_time_limit(0); // No time limit
+        ini_set('memory_limit', '1G');
 
+        // Disable query log to save memory
+        DB::disableQueryLog();
+
+        try {
             $media = $this->import->getFirstMedia('imports');
             if (!$media) {
                 throw new \Exception('Import file not found');
             }
 
-            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($media->getPath());
+            // Use memory-efficient reader
+            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($media->getPath());
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($media->getPath());
 
             // Process all sheets in the workbook
             $allSheets = $spreadsheet->getAllSheets();
@@ -75,116 +83,113 @@ class ProcessImportJob implements ShouldQueue
 
             $this->import->update(['total_rows' => $totalRows]);
 
-            DB::beginTransaction();
+            $processedRows = 0;
+            $chunkSize = 100; // Process 100 rows at a time
 
-            try {
-                $processedRows = 0;
+            // Process each sheet
+            foreach ($allSheets as $sheetIndex => $worksheet) {
+                $sheetName = $worksheet->getTitle();
+                Log::info("Processing sheet: {$sheetName}");
 
-                // Process each sheet
-                foreach ($allSheets as $sheetIndex => $worksheet) {
-                    $sheetName = $worksheet->getTitle();
-                    Log::info("Processing sheet: {$sheetName}");
+                // Reset last known values for each sheet
+                $this->lastKnownOwnerName = null;
+                $this->lastKnownFileName = null;
+                $this->lastKnownFileNumber = null;
 
-                    // Reset last known values for each sheet
-                    $this->lastKnownOwnerName = null;
-                    $this->lastKnownFileName = null;
-                    $this->lastKnownFileNumber = null;
+                $rows = $worksheet->toArray();
 
-                    $rows = $worksheet->toArray();
-
-                    if (count($rows) < 2) {
-                        Log::info("Sheet {$sheetName} has no data rows, skipping");
-                        continue;
-                    }
-
-                    $rawHeaders = array_map(fn($h) => trim($h ?? ''), $rows[0]);
-                    $headers = $this->mapArabicHeaders($rawHeaders);
-                    $dataRows = array_slice($rows, 1);
-
-                    Log::debug("Import headers mapping", [
-                        'raw_headers' => $rawHeaders,
-                        'mapped_headers' => $headers,
-                    ]);
-
-                    foreach ($dataRows as $index => $row) {
-                        $rowNumber = $index + 2;
-                        $this->currentRowNumber = $rowNumber;
-                        $this->currentSheetName = $sheetName;
-                        $rowData = array_combine($headers, $row);
-
-                        // Add raw headers for reference (to extract owner name from header)
-                        $rowData['_raw_headers'] = $rawHeaders;
-                        $rowData['_headers_map'] = array_combine($headers, $rawHeaders);
-
-                        try {
-                            $this->processRow($rowData);
-                            $successCount++;
-                        } catch (\Exception $e) {
-                            $failedCount++;
-                            $errorKey = "{$sheetName}:Row {$rowNumber}";
-                            $errors['rows'][$errorKey] = [
-                                'sheet' => $sheetName,
-                                'row_number' => $rowNumber,
-                                'errors' => $e->getMessage(),
-                                'data' => $rowData,
-                            ];
-
-                            // Log detailed error information
-                            Log::error("Import row failed", [
-                                'import_id' => $this->import->id,
-                                'sheet' => $sheetName,
-                                'row_number' => $rowNumber,
-                                'error' => $e->getMessage(),
-                                'row_data' => $rowData,
-                                'trace' => $e->getTraceAsString(),
-                            ]);
-
-                            if (!$this->skipErrors) {
-                                throw $e;
-                            }
-                        }
-
-                        $processedRows++;
-
-                        // Update progress every 10 rows
-                        if ($processedRows % 10 === 0) {
-                            $this->import->update([
-                                'processed_rows' => $processedRows,
-                                'success_rows' => $successCount,
-                                'failed_rows' => $failedCount,
-                            ]);
-                        }
-                    }
-
-                    Log::info("Completed sheet {$sheetName}: {$successCount} success, {$failedCount} failed");
+                if (count($rows) < 2) {
+                    Log::info("Sheet {$sheetName} has no data rows, skipping");
+                    continue;
                 }
 
-                DB::commit();
+                $rawHeaders = array_map(fn($h) => trim($h ?? ''), $rows[0]);
+                $headers = $this->mapArabicHeaders($rawHeaders);
+                $dataRows = array_slice($rows, 1);
 
-                // Final update with accurate counts
-                $this->import->update([
-                    'processed_rows' => $processedRows,
-                    'success_rows' => $successCount,
-                    'failed_rows' => $failedCount,
-                ]);
+                // Process in chunks
+                $chunks = array_chunk($dataRows, $chunkSize, true);
 
-                $this->import->update([
-                    'status' => 'completed',
-                    'completed_at' => now(),
-                    'errors' => $errors,
-                    'summary' => [
-                        'total' => $totalRows,
-                        'success' => $successCount,
-                        'failed' => $failedCount,
-                    ],
-                ]);
+                foreach ($chunks as $chunk) {
+                    DB::beginTransaction();
 
-                Log::info("ProcessImportJob completed for import ID: {$this->import->id}");
+                    try {
+                        foreach ($chunk as $index => $row) {
+                            $rowNumber = $index + 2;
+                            $this->currentRowNumber = $rowNumber;
+                            $this->currentSheetName = $sheetName;
+                            $rowData = array_combine($headers, $row);
 
-            } catch (\Exception $e) {
-                DB::rollBack();
-                throw $e;
+                            $rowData['_raw_headers'] = $rawHeaders;
+                            $rowData['_headers_map'] = array_combine($headers, $rawHeaders);
+
+                            try {
+                                $this->processRow($rowData);
+                                $successCount++;
+                            } catch (\Exception $e) {
+                                $failedCount++;
+
+                                // Only store first 100 errors to save memory
+                                if (count($errors['rows'] ?? []) < 100) {
+                                    $errors['rows']["{$sheetName}:Row {$rowNumber}"] = [
+                                        'sheet' => $sheetName,
+                                        'row_number' => $rowNumber,
+                                        'errors' => $e->getMessage(),
+                                        'data' => array_slice($rowData, 0, 5), // Only first 5 fields
+                                    ];
+                                }
+
+                                if (!$this->skipErrors) {
+                                    throw $e;
+                                }
+                            }
+
+                            $processedRows++;
+                        }
+
+                        DB::commit();
+
+                        // Update progress after each chunk
+                        $this->import->update([
+                            'processed_rows' => $processedRows,
+                            'success_rows' => $successCount,
+                            'failed_rows' => $failedCount,
+                        ]);
+
+                        // Free memory
+                        gc_collect_cycles();
+
+                    } catch (\Exception $e) {
+                        DB::rollBack();
+                        if (!$this->skipErrors) {
+                            throw $e;
+                        }
+                    }
+                }
+
+                Log::info("Completed sheet {$sheetName}: {$successCount} success, {$failedCount} failed");
             }
+
+            // Free spreadsheet memory
+            $spreadsheet->disconnectWorksheets();
+            unset($spreadsheet);
+
+            // Final update
+            $this->import->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+                'processed_rows' => $processedRows,
+                'success_rows' => $successCount,
+                'failed_rows' => $failedCount,
+                'errors' => $errors,
+                'summary' => [
+                    'total' => $totalRows,
+                    'success' => $successCount,
+                    'failed' => $failedCount,
+                ],
+            ]);
+
+            Log::info("ProcessImportJob completed for import ID: {$this->import->id}");
 
         } catch (\Exception $e) {
             Log::error("ProcessImportJob failed for import ID: {$this->import->id}: " . $e->getMessage());
