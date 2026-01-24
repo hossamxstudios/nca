@@ -146,6 +146,11 @@
                                         <div class="info-item">
                                             <span class="badge bg-primary fs-6">{{ $file->file_name }}</span>
                                         </div>
+                                        @if($fileHasMedia)
+                                            <a href="{{ route('admin.files.download-original', $file->id) }}" class="btn btn-outline-primary btn-sm" title="تحميل الملف الأصلي">
+                                                <i class="ti ti-download me-1"></i>تحميل الملف
+                                            </a>
+                                        @endif
                                         @if($file->land)
                                         <div class="info-item">
                                             <i class="ti ti-map-pin"></i>
@@ -171,17 +176,20 @@
                                             <button type="button" class="btn btn-outline-dark btn-sm" data-bs-toggle="modal" data-bs-target="#printBarcodeModal_{{ $file->id }}" title="طباعة الباركود">
                                                 <i class="ti ti-printer"></i> طباعة الباركود
                                             </button>
-                                            @endif
-                                        {{-- Conditional action button in header --}}
-                                        @if(!$fileHasMedia)
-                                            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadFileModal_{{ $file->id }}">
-                                                <i class="ti ti-upload me-1"></i>رفع ملف
-                                            </button>
-                                        @else
-                                            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editFileItemsModal_{{ $file->id }}">
-                                             <i class="ti ti-edit me-1"></i>تعديل الملفات الفرعية
-                                            </button>
                                         @endif
+
+                                        {{-- Conditional action button in header --}}
+                                        @can('clients.create')
+                                            @if(!$fileHasMedia)
+                                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#uploadFileModal_{{ $file->id }}">
+                                                    <i class="ti ti-upload me-1"></i>رفع ملف
+                                                </button>
+                                            @else
+                                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#editFileItemsModal_{{ $file->id }}">
+                                                <i class="ti ti-edit me-1"></i>تعديل الملفات الفرعية
+                                                </button>
+                                            @endif
+                                        @endcan
                                     </div>
                                     <span class="badge bg-success-subtle text-success">{{ $totalExpectedPages }} صفحة</span>
                                     @if($file->barcode)
@@ -212,7 +220,7 @@
                                                     <canvas class="pdf-thumbnail" data-pdf-url="{{ $originalPdfUrl }}" data-page="{{ $fileItem->from_page }}" style="max-width: 100%; max-height: 100%;"></canvas>
                                                 </div>
                                                 <div class="gap-1 d-flex">
-                                                    <button type="button" class="btn btn-sm btn-outline-primary flex-fill btn-preview-pdf" data-pdf-url="{{ $originalPdfUrl }}" data-from-page="{{ $fileItem->from_page }}" data-to-page="{{ $fileItem->to_page }}" data-title="{{ $fileItem->item->name ?? 'معاينة' }}">
+                                                    <button type="button" class="btn btn-sm btn-outline-primary flex-fill btn-preview-pdf" data-pdf-url="{{ $originalPdfUrl }}" data-from-page="{{ $fileItem->from_page }}" data-to-page="{{ $fileItem->to_page }}" data-title="{{ $fileItem->item->name ?? 'معاينة' }}" data-client-id="{{ $client->id }}" data-client-name="{{ $client->name }}" data-file-name="{{ $file->file_name }}" data-item-name="{{ $fileItem->item->name ?? 'بند' }}">
                                                         <i class="ti ti-eye me-1"></i>معاينة
                                                     </button>
                                                     <a href="{{ route('admin.files.download-pages', $file->id) }}?from_page={{ $fileItem->from_page }}&to_page={{ $fileItem->to_page }}&filename={{ urlencode($file->file_name . '_' . ($fileItem->item->name ?? 'بند') . '_ص' . $fileItem->from_page . '-' . $fileItem->to_page) }}" class="btn btn-sm btn-outline-success flex-fill">
@@ -315,7 +323,7 @@
     @include('admin.clients.show-print-barcode-modal')
     @include('admin.clients.edit-file-location-modal')
     @can('clients.create')
-    @include('admin.clients.show-add-file-modal')
+        @include('admin.clients.show-add-file-modal')
     @endcan
 
     {{-- PDF Preview Modal --}}
@@ -358,14 +366,42 @@
                     const title = this.dataset.title || 'معاينة';
                     const fromPage = parseInt(this.dataset.fromPage) || 1;
                     const toPage = parseInt(this.dataset.toPage) || 1;
+                    const clientId = this.dataset.clientId;
+                    const clientName = this.dataset.clientName;
+                    const fileName = this.dataset.fileName;
+                    const itemName = this.dataset.itemName;
 
                     document.getElementById('pdfPreviewModalTitle').textContent = title + ' (ص ' + fromPage + ' - ' + toPage + ')';
                     document.getElementById('totalPagesNum').textContent = (toPage - fromPage + 1);
 
-                    openPdfPreviewScrollable(pdfUrl, fromPage, toPage);
-
-                    const modal = new bootstrap.Modal(document.getElementById('pdfPreviewModal'));
+                    const modalEl = document.getElementById('pdfPreviewModal');
+                    const modal = new bootstrap.Modal(modalEl);
                     modal.show();
+
+                    // Load PDF after modal is fully shown to get correct container width
+                    modalEl.addEventListener('shown.bs.modal', function onShown() {
+                        modalEl.removeEventListener('shown.bs.modal', onShown);
+                        openPdfPreviewScrollable(pdfUrl, fromPage, toPage);
+                    });
+
+                    // Log view activity
+                    if (clientId) {
+                        fetch('{{ route("admin.clients.log-view") }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                client_id: clientId,
+                                client_name: clientName,
+                                file_name: fileName,
+                                item_name: itemName,
+                                from_page: fromPage,
+                                to_page: toPage
+                            })
+                        });
+                    }
                 });
             });
 

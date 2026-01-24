@@ -42,11 +42,13 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::delete('/clients/{client}'                                   , [ClientController::class,                    'destroy'])->name('clients.destroy');
     Route::get('/clients/{client}/print-barcodes'                       , [ClientController::class,              'printBarcodes'])->name('clients.print-barcodes');
     Route::post('/clients/log-print'                                     , [ClientController::class,                   'logPrint'])->name('clients.log-print');
+    Route::post('/clients/log-view'                                      , [ClientController::class,                    'logView'])->name('clients.log-view');
     Route::post('/clients/{id}/restore'                                 , [ClientController::class,                    'restore'])->name('clients.restore');
     Route::delete('/clients/{id}/force-delete'                          , [ClientController::class,                'forceDelete'])->name('clients.force-delete');
     // Files
     Route::post('/files/{file}/upload'                                  , [FileController::class,                       'upload'])->name('files.upload');
     Route::get('/files/{file}/download-pages'                           , [FileController::class,                'downloadPages'])->name('files.download-pages');
+    Route::get('/files/{file}/download-original'                        , [FileController::class,             'downloadOriginal'])->name('files.download-original');
     Route::put('/files/{file}/update-items'                             , [FileController::class,                  'updateItems'])->name('files.update-items');
     Route::put('/files/{file}/update-location'                          , [FileController::class,               'updateLocation'])->name('files.update-location');
     Route::post('/clients/{client}/files'                               , [FileController::class,                        'store'])->name('files.store');

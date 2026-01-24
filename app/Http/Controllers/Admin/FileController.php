@@ -17,11 +17,14 @@ use App\Models\Zone;
 use App\Models\Area;
 use App\Models\Item;
 use App\Jobs\ProcessPdfJob;
+use App\Models\ActivityLog;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Process;
+use setasign\Fpdi\Fpdi;
+use Smalot\PdfParser\Parser as PdfParser;
 
 class FileController extends Controller {
 
@@ -103,20 +106,47 @@ class FileController extends Controller {
         $outputPath = $tempDir . '/download_' . $file->id . '_' . time() . '.pdf';
         $pageRange = $fromPage === $toPage ? $fromPage : "{$fromPage}-{$toPage}";
 
-        // Extract pages using qpdf (full path for homebrew)
+        // Extract pages using FPDI (pure PHP - no external dependencies)
         try {
-            $qpdfPath = '/opt/homebrew/bin/qpdf';
-            $command = "{$qpdfPath} '{$pdfPath}' --pages . {$pageRange} -- '{$outputPath}' 2>&1";
+            $pdf = new Fpdi();
+            $pageCount = $pdf->setSourceFile($pdfPath);
 
-            $result = Process::run($command);
+            // Validate page range
+            if ($fromPage > $pageCount || $toPage > $pageCount) {
+                throw new \Exception("نطاق الصفحات غير صالح. الملف يحتوي على {$pageCount} صفحة فقط.");
+            }
 
-            Log::info('qpdf command: ' . $command);
-            Log::info('qpdf output: ' . $result->output());
-            Log::info('qpdf error: ' . $result->errorOutput());
+            // Import selected pages
+            for ($pageNo = $fromPage; $pageNo <= $toPage; $pageNo++) {
+                $templateId = $pdf->importPage($pageNo);
+                $size = $pdf->getTemplateSize($templateId);
+                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $pdf->useTemplate($templateId);
+            }
+
+            // Save to output file
+            $pdf->Output($outputPath, 'F');
 
             if (!file_exists($outputPath)) {
-                throw new \Exception('فشل استخراج الصفحات: ' . $result->errorOutput());
+                throw new \Exception('فشل استخراج الصفحات');
             }
+
+            // Log download activity
+            $pagesCount = $toPage - $fromPage + 1;
+            $client = $file->client;
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_DOWNLOAD, ActivityLog::GROUP_FILES)
+                ->description("تحميل صفحات: (ص {$fromPage} - {$toPage}) - ملف: {$file->file_name} - عميل: {$client->name}")
+                ->withNewValues([
+                    'client_id' => $client->id,
+                    'client_name' => $client->name,
+                    'file_id' => $file->id,
+                    'file_name' => $file->file_name,
+                    'from_page' => $fromPage,
+                    'to_page' => $toPage,
+                    'pages_count' => $pagesCount,
+                ])
+                ->log();
 
             // Return file for download and delete after
             return response()->download($outputPath, "{$filename}.pdf")->deleteFileAfterSend(true);
@@ -175,27 +205,28 @@ class FileController extends Controller {
     }
 
     /**
-     * Get PDF page count using pdfinfo or fallback method
+     * Get PDF page count using PdfParser (pure PHP)
      */
     private function getPdfPageCount(string $pdfPath): int
     {
-        // Try pdfinfo first (faster)
         try {
-            $result = Process::run("pdfinfo '{$pdfPath}' | grep Pages | awk '{print $2}'");
-            if ($result->successful()) {
-                $pages = (int) trim($result->output());
-                if ($pages > 0) {
-                    return $pages;
-                }
-            }
+            // Use PdfParser - pure PHP, no external dependencies
+            $parser = new PdfParser();
+            $pdf = $parser->parseFile($pdfPath);
+            $pages = $pdf->getPages();
+            return count($pages);
         } catch (\Exception $e) {
-            Log::warning('pdfinfo failed: ' . $e->getMessage());
+            Log::warning('PdfParser failed: ' . $e->getMessage());
         }
 
-        // Fallback: count pages by reading PDF
-        $content = file_get_contents($pdfPath);
-        $count = preg_match_all("/\/Page\W/", $content, $matches);
-        return max(1, $count);
+        // Fallback: count pages by reading PDF structure
+        try {
+            $content = file_get_contents($pdfPath);
+            $count = preg_match_all("/\/Page\W/", $content, $matches);
+            return max(1, $count);
+        } catch (\Exception $e) {
+            return 1;
+        }
     }
 
     /**
@@ -279,6 +310,62 @@ class FileController extends Controller {
     }
 
     /**
+     * Download the full original PDF file
+     */
+    public function downloadOriginal(File $file)
+    {
+        $media = $file->getFirstMedia('files');
+        if (!$media) {
+            return back()->with('error', 'لا يوجد ملف PDF');
+        }
+
+        // Load relationships for filename
+        $file->load(['client', 'land.district', 'land.zone', 'land.area', 'room', 'lane', 'stand', 'rack']);
+        $client = $file->client;
+
+        // Build descriptive filename
+        // Format: ClientName_District-Zone-Area-LandNo_Room-Lane-Stand-Rack_FileNumber.pdf
+        $geoLocation = collect([
+            $file->land?->district?->name,
+            $file->land?->zone?->name,
+            $file->land?->area?->name,
+            $file->land?->land_no ? "أرض{$file->land->land_no}" : null,
+        ])->filter()->implode('-');
+
+        $physicalLocation = collect([
+            $file->room?->name ? "غ{$file->room->name}" : null,
+            $file->lane?->name ? "م{$file->lane->name}" : null,
+            $file->stand?->name ? "س{$file->stand->name}" : null,
+            $file->rack?->name ? "ر{$file->rack->name}" : null,
+        ])->filter()->implode('-');
+
+        $filenameParts = collect([
+            $client->name,
+            $geoLocation ?: null,
+            $physicalLocation ?: null,
+            $file->file_name,
+        ])->filter()->implode('_');
+
+        // Sanitize filename (remove invalid characters)
+        $filename = preg_replace('/[\/\\\\:*?"<>|]/', '-', $filenameParts);
+
+        // Log download activity
+        ActivityLogger::make()
+            ->action(ActivityLog::ACTION_DOWNLOAD, ActivityLog::GROUP_FILES)
+            ->description("تحميل الملف الأصلي: {$file->file_name} ({$file->pages_count} صفحة) - عميل: {$client->name}")
+            ->withNewValues([
+                'client_id' => $client->id,
+                'client_name' => $client->name,
+                'file_id' => $file->id,
+                'file_name' => $file->file_name,
+                'pages_count' => $file->pages_count,
+            ])
+            ->log();
+
+        return response()->download($media->getPath(), "{$filename}.pdf");
+    }
+
+    /**
      * Update file location (geo + physical) - Super Admin only
      */
     public function updateLocation(Request $request, File $file)
@@ -293,6 +380,20 @@ class FileController extends Controller {
             'stand_id' => 'nullable|exists:stands,id',
             'rack_id' => 'nullable|exists:racks,id',
         ]);
+
+        // Capture old values for logging
+        $oldGeoValues = $file->land ? [
+            'district' => $file->land->district?->name,
+            'zone' => $file->land->zone?->name,
+            'area' => $file->land->area?->name,
+            'land_no' => $file->land->land_no,
+        ] : [];
+        $oldPhysicalValues = [
+            'room' => $file->room?->name,
+            'lane' => $file->lane?->name,
+            'stand' => $file->stand?->name,
+            'rack' => $file->rack?->name,
+        ];
 
         DB::beginTransaction();
         try {
@@ -322,6 +423,36 @@ class FileController extends Controller {
                 'stand_id' => $request->stand_id,
                 'rack_id' => $request->rack_id,
             ]);
+
+            // Refresh relations for new values
+            $file->refresh();
+            $file->load(['land.district', 'land.zone', 'land.area', 'room', 'lane', 'stand', 'rack']);
+
+            // Get new values for logging
+            $newGeoValues = [
+                'district' => $file->land?->district?->name,
+                'zone' => $file->land?->zone?->name,
+                'area' => $file->land?->area?->name,
+                'land_no' => $file->land?->land_no,
+            ];
+            $newPhysicalValues = [
+                'room' => $file->room?->name,
+                'lane' => $file->lane?->name,
+                'stand' => $file->stand?->name,
+                'rack' => $file->rack?->name,
+            ];
+
+            // Log location update
+            $client = $file->client;
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_UPDATE, ActivityLog::GROUP_FILES)
+                ->on($file)
+                ->description("تحديث موقع ملف: {$file->file_name} - عميل: {$client->name}")
+                ->withChanges(
+                    ['geo' => $oldGeoValues, 'physical' => $oldPhysicalValues],
+                    ['geo' => $newGeoValues, 'physical' => $newPhysicalValues]
+                )
+                ->log();
 
             DB::commit();
 

@@ -118,8 +118,17 @@ class ClientController extends Controller
             'lands.governorate', 'lands.city', 'lands.district', 'lands.zone', 'lands.area'
         ]);
 
-        // Log view activity
-        ActivityLogger::viewed($client, ActivityLog::GROUP_CLIENTS);
+        // Log view activity (skip if viewed within last 3 minutes)
+        $recentView = ActivityLog::where('user_id', auth()->id())
+            ->where('action_type', ActivityLog::ACTION_VIEW)
+            ->where('subject_type', Client::class)
+            ->where('subject_id', $client->id)
+            ->where('created_at', '>=', now()->subMinutes(3))
+            ->exists();
+
+        if (!$recentView) {
+            ActivityLogger::viewed($client, ActivityLog::GROUP_CLIENTS);
+        }
 
         $items = Item::orderBy('order')->get();
 
@@ -220,6 +229,38 @@ class ClientController extends Controller
             [$request->client_id],
             ActivityLog::GROUP_CLIENTS
         );
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Log view activity for PDF pages (AJAX)
+     */
+    public function logView(Request $request)
+    {
+        $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'client_name' => 'required|string',
+            'file_name' => 'required|string',
+            'item_name' => 'required|string',
+            'from_page' => 'required|integer|min:1',
+            'to_page' => 'required|integer|min:1',
+        ]);
+
+        $pagesCount = $request->to_page - $request->from_page + 1;
+
+        ActivityLogger::make()
+            ->action(ActivityLog::ACTION_VIEW, ActivityLog::GROUP_FILES)
+            ->description("معاينة صفحات: {$request->item_name} (ص {$request->from_page} - {$request->to_page}) - ملف: {$request->file_name} - عميل: {$request->client_name}")
+            ->withNewValues([
+                'client_id' => $request->client_id,
+                'file_name' => $request->file_name,
+                'item_name' => $request->item_name,
+                'from_page' => $request->from_page,
+                'to_page' => $request->to_page,
+                'pages_count' => $pagesCount,
+            ])
+            ->log();
 
         return response()->json(['success' => true]);
     }

@@ -36,13 +36,45 @@ document.addEventListener('DOMContentLoaded', function() {
                             ...Object.keys(data.new_values || {})
                         ]);
 
+                        // Field labels in Arabic
+                        const fieldLabels = {
+                            'client_id': 'رقم العميل',
+                            'client_name': 'اسم العميل',
+                            'file_id': 'رقم الملف',
+                            'file_name': 'اسم الملف',
+                            'from_page': 'من صفحة',
+                            'to_page': 'إلى صفحة',
+                            'pages_count': 'عدد الصفحات',
+                            'item_name': 'البند',
+                        };
+
+                        // Check if we have page range to combine
+                        const hasPageRange = data.new_values?.from_page && data.new_values?.to_page;
+
                         allKeys.forEach(key => {
+                            // Skip from_page and to_page if we're combining them
+                            if (hasPageRange && (key === 'from_page' || key === 'to_page')) {
+                                if (key === 'from_page') {
+                                    // Add combined page range row
+                                    changesHtml += `
+                                        <tr>
+                                            <td><strong>نطاق الصفحات</strong></td>
+                                            <td>-</td>
+                                            <td class="text-success">من ص${data.new_values.from_page} إلى ص${data.new_values.to_page}</td>
+                                        </tr>
+                                    `;
+                                }
+                                return;
+                            }
+
                             const oldVal = data.old_values?.[key] ?? '-';
                             const newVal = data.new_values?.[key] ?? '-';
+                            const label = fieldLabels[key] || key;
+
                             if (oldVal !== newVal) {
                                 changesHtml += `
                                     <tr>
-                                        <td><strong>${key}</strong></td>
+                                        <td><strong>${label}</strong></td>
                                         <td class="text-danger">${oldVal}</td>
                                         <td class="text-success">${newVal}</td>
                                     </tr>

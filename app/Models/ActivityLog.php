@@ -39,6 +39,7 @@ class ActivityLog extends Model
     const ACTION_BULK_IMPORT = 'bulk_import';
     const ACTION_BULK_DELETE = 'bulk_delete';
     const ACTION_EXPORT = 'export';
+    const ACTION_DOWNLOAD = 'download';
     const ACTION_SEARCH = 'search';
 
     // Action Groups
@@ -111,6 +112,7 @@ class ActivityLog extends Model
             self::ACTION_BULK_IMPORT => 'استيراد جماعي',
             self::ACTION_BULK_DELETE => 'حذف جماعي',
             self::ACTION_EXPORT => 'تصدير',
+            self::ACTION_DOWNLOAD => 'تحميل',
             self::ACTION_SEARCH => 'بحث',
             default => $this->action_type,
         };
@@ -146,6 +148,7 @@ class ActivityLog extends Model
             self::ACTION_PRINT => 'purple',
             self::ACTION_BULK_IMPORT => 'cyan',
             self::ACTION_EXPORT => 'teal',
+            self::ACTION_DOWNLOAD => 'success',
             self::ACTION_SEARCH => 'dark',
             default => 'secondary',
         };
@@ -163,7 +166,8 @@ class ActivityLog extends Model
             self::ACTION_DELETE, self::ACTION_BULK_DELETE => 'ti-trash',
             self::ACTION_PRINT => 'ti-file-text',
             self::ACTION_BULK_IMPORT => 'ti-upload',
-            self::ACTION_EXPORT => 'ti-download',
+            self::ACTION_EXPORT => 'ti-file-export',
+            self::ACTION_DOWNLOAD => 'ti-download',
             self::ACTION_SEARCH => 'ti-search',
             default => 'ti-activity',
         };

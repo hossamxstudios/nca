@@ -50,7 +50,6 @@
                     </div>
                     @endif
                 </div>
-
                 {{-- User --}}
                 <div class="text-end" style="min-width: 140px;">
                     @if($log->user)
@@ -64,10 +63,9 @@
                     </div>
                     @endif
                 </div>
-
                 {{-- Details Button --}}
-                <button type="button" class="btn btn-sm btn-outline-primary btn-view-details" data-log-id="{{ $log->id }}" style="width: 36px; height: 36px; padding: 0;">
-                    <i class="ti ti-info-circle"></i>
+                <button type="button" class="btn btn-outline-primary btn-view-details" data-log-id="{{ $log->id }}" style="width: 36px; height: 36px; padding: 0;">
+                    <i class="ti ti-eye fs-4"></i>
                 </button>
             </div>
         </div>
