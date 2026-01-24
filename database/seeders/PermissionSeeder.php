@@ -101,6 +101,11 @@ class PermissionSeeder extends Seeder
                 'reports.view' => 'عرض التقارير',
                 'reports.export' => 'تصدير التقارير',
                 'reports.create' => 'إنشاء تقرير',
+
+                // Activity Logs
+                'activity-logs.view' => 'عرض سجل النشاطات',
+                'activity-logs.delete' => 'حذف سجل النشاطات',
+                'activity-logs.export' => 'تصدير سجل النشاطات',
             ];
 
             // Create permissions

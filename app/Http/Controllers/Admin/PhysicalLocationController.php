@@ -7,6 +7,8 @@ use App\Models\Room;
 use App\Models\Lane;
 use App\Models\Stand;
 use App\Models\Rack;
+use App\Models\ActivityLog;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -72,7 +74,10 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
-            Room::create($request->only(['name', 'building_name', 'description']));
+            $room = Room::create($request->only(['name', 'building_name', 'description']));
+
+            ActivityLogger::created($room, ActivityLog::GROUP_PHYSICAL, ['name' => $room->name]);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم إضافة الغرفة بنجاح');
         } catch (\Exception $e) {
             Log::error('Store room error: ' . $e->getMessage());
@@ -92,7 +97,12 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
+            $oldValues = $room->only(['name', 'building_name']);
             $room->update($request->only(['name', 'building_name', 'description']));
+            $newValues = $room->only(['name', 'building_name']);
+
+            ActivityLogger::updated($room, ActivityLog::GROUP_PHYSICAL, $oldValues, $newValues);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم تحديث الغرفة بنجاح');
         } catch (\Exception $e) {
             Log::error('Update room error: ' . $e->getMessage());
@@ -110,6 +120,8 @@ class PhysicalLocationController extends Controller
         }
 
         try {
+            ActivityLogger::deleted($room, ActivityLog::GROUP_PHYSICAL);
+
             $room->delete();
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم حذف الغرفة بنجاح');
         } catch (\Exception $e) {
@@ -132,7 +144,10 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
-            Lane::create($request->only(['room_id', 'name', 'description']));
+            $lane = Lane::create($request->only(['room_id', 'name', 'description']));
+
+            ActivityLogger::created($lane, ActivityLog::GROUP_PHYSICAL, ['name' => $lane->name]);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم إضافة الممر بنجاح');
         } catch (\Exception $e) {
             Log::error('Store lane error: ' . $e->getMessage());
@@ -152,7 +167,12 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
+            $oldValues = $lane->only(['name']);
             $lane->update($request->only(['room_id', 'name', 'description']));
+            $newValues = $lane->only(['name']);
+
+            ActivityLogger::updated($lane, ActivityLog::GROUP_PHYSICAL, $oldValues, $newValues);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم تحديث الممر بنجاح');
         } catch (\Exception $e) {
             Log::error('Update lane error: ' . $e->getMessage());
@@ -170,6 +190,8 @@ class PhysicalLocationController extends Controller
         }
 
         try {
+            ActivityLogger::deleted($lane, ActivityLog::GROUP_PHYSICAL);
+
             $lane->delete();
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم حذف الممر بنجاح');
         } catch (\Exception $e) {
@@ -192,7 +214,10 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
-            Stand::create($request->only(['lane_id', 'name', 'description']));
+            $stand = Stand::create($request->only(['lane_id', 'name', 'description']));
+
+            ActivityLogger::created($stand, ActivityLog::GROUP_PHYSICAL, ['name' => $stand->name]);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم إضافة الحامل بنجاح');
         } catch (\Exception $e) {
             Log::error('Store stand error: ' . $e->getMessage());
@@ -212,7 +237,12 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
+            $oldValues = $stand->only(['name']);
             $stand->update($request->only(['lane_id', 'name', 'description']));
+            $newValues = $stand->only(['name']);
+
+            ActivityLogger::updated($stand, ActivityLog::GROUP_PHYSICAL, $oldValues, $newValues);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم تحديث الحامل بنجاح');
         } catch (\Exception $e) {
             Log::error('Update stand error: ' . $e->getMessage());
@@ -230,6 +260,8 @@ class PhysicalLocationController extends Controller
         }
 
         try {
+            ActivityLogger::deleted($stand, ActivityLog::GROUP_PHYSICAL);
+
             $stand->delete();
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم حذف الحامل بنجاح');
         } catch (\Exception $e) {
@@ -252,7 +284,10 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
-            Rack::create($request->only(['stand_id', 'name', 'description']));
+            $rack = Rack::create($request->only(['stand_id', 'name', 'description']));
+
+            ActivityLogger::created($rack, ActivityLog::GROUP_PHYSICAL, ['name' => $rack->name]);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم إضافة الدرج بنجاح');
         } catch (\Exception $e) {
             Log::error('Store rack error: ' . $e->getMessage());
@@ -272,7 +307,12 @@ class PhysicalLocationController extends Controller
         ]);
 
         try {
+            $oldValues = $rack->only(['name']);
             $rack->update($request->only(['stand_id', 'name', 'description']));
+            $newValues = $rack->only(['name']);
+
+            ActivityLogger::updated($rack, ActivityLog::GROUP_PHYSICAL, $oldValues, $newValues);
+
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم تحديث الدرج بنجاح');
         } catch (\Exception $e) {
             Log::error('Update rack error: ' . $e->getMessage());
@@ -290,6 +330,8 @@ class PhysicalLocationController extends Controller
         }
 
         try {
+            ActivityLogger::deleted($rack, ActivityLog::GROUP_PHYSICAL);
+
             $rack->delete();
             return redirect()->route('admin.physical-locations.index')->with('success', 'تم حذف الدرج بنجاح');
         } catch (\Exception $e) {

@@ -107,10 +107,10 @@
                                 <span id="selectedCount">0</span> صلاحية محددة
                             </div>
                             <div class="gap-2 d-flex">
-                                <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">
+                                <button type="button" class="btn btn-sm btn-light text-danger" onclick="bulkDelete()">
                                     <i class="ti ti-trash me-1"></i>حذف المحدد
                                 </button>
-                                <button type="button" class="btn btn-sm btn-secondary" onclick="clearSelection()">
+                                <button type="button" class="btn btn-sm btn-light text-primary" onclick="clearSelection()">
                                     <i class="ti ti-x me-1"></i>إلغاء
                                 </button>
                             </div>

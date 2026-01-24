@@ -131,6 +131,16 @@
                     </a>
                 </li>
             @endcan
+            <!-- Activity Logs -->
+            @can('activity-logs.view')
+                <li class="mt-3 side-nav-title">المراقبة والتتبع</li>
+                <li class="side-nav-item">
+                    <a href="{{ route('admin.activity-logs.index') }}" class="side-nav-link {{ request()->routeIs('admin.activity-logs.*') ? 'active' : '' }}">
+                        <span class="menu-icon"><i class="ti ti-activity"></i></span>
+                        <span class="menu-text">سجل النشاطات</span>
+                    </a>
+                </li>
+            @endcan
 
         </ul>
     </div>

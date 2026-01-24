@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Item;
+use App\Models\ActivityLog;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -40,11 +42,14 @@ class ItemController extends Controller
         ]);
 
         try {
-            Item::create([
+            $item = Item::create([
                 'name' => $request->name,
                 'description' => $request->description,
                 'order' => $request->order ?? 0,
             ]);
+
+            ActivityLogger::created($item, ActivityLog::GROUP_SETTINGS, ['name' => $item->name]);
+
             return redirect()->route('admin.items.index')->with('success', 'تم إضافة نوع المحتوى بنجاح');
         } catch (\Exception $e) {
             Log::error('Store item error: ' . $e->getMessage());
@@ -64,11 +69,16 @@ class ItemController extends Controller
         ]);
 
         try {
+            $oldValues = $item->only(['name']);
             $item->update([
                 'name' => $request->name,
                 'description' => $request->description,
                 'order' => $request->order ?? 0,
             ]);
+            $newValues = $item->only(['name']);
+
+            ActivityLogger::updated($item, ActivityLog::GROUP_SETTINGS, $oldValues, $newValues);
+
             return redirect()->route('admin.items.index')->with('success', 'تم تحديث نوع المحتوى بنجاح');
         } catch (\Exception $e) {
             Log::error('Update item error: ' . $e->getMessage());
@@ -86,6 +96,8 @@ class ItemController extends Controller
         }
 
         try {
+            ActivityLogger::deleted($item, ActivityLog::GROUP_SETTINGS);
+
             $item->delete();
             return redirect()->route('admin.items.index')->with('success', 'تم حذف نوع المحتوى بنجاح');
         } catch (\Exception $e) {
@@ -109,6 +121,12 @@ class ItemController extends Controller
             foreach ($request->items as $itemData) {
                 Item::where('id', $itemData['id'])->update(['order' => $itemData['order']]);
             }
+
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_UPDATE, ActivityLog::GROUP_SETTINGS)
+                ->description("تحديث ترتيب أنواع المحتوى (" . count($request->items) . " عنصر)")
+                ->log();
+
             return response()->json(['success' => true, 'message' => 'تم تحديث الترتيب بنجاح']);
         } catch (\Exception $e) {
             Log::error('Update items order error: ' . $e->getMessage());

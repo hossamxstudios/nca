@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Client\StoreClientRequest;
 use App\Http\Requests\Client\UpdateClientRequest;
+use App\Models\ActivityLog;
 use App\Models\Client;
 use App\Models\File;
 use App\Models\Governorate;
 use App\Models\Item;
 use App\Models\Land;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -116,6 +118,9 @@ class ClientController extends Controller
             'lands.governorate', 'lands.city', 'lands.district', 'lands.zone', 'lands.area'
         ]);
 
+        // Log view activity
+        ActivityLogger::viewed($client, ActivityLog::GROUP_CLIENTS);
+
         $items = Item::orderBy('order')->get();
 
         return view('admin.clients.show', compact('client', 'items'));
@@ -127,6 +132,10 @@ class ClientController extends Controller
         DB::beginTransaction();
         try {
             $client = Client::create($request->validated());
+
+            // Log create activity
+            ActivityLogger::created($client, ActivityLog::GROUP_CLIENTS, $request->validated());
+
             DB::commit();
             return redirect()->route('admin.clients.index')
                 ->with('success', 'تم إضافة العميل بنجاح');
@@ -142,7 +151,13 @@ class ClientController extends Controller
     {
         DB::beginTransaction();
         try {
+            $oldValues = $client->only(['name', 'national_id', 'mobile', 'telephone', 'address']);
             $client->update($request->validated());
+            $newValues = $client->only(['name', 'national_id', 'mobile', 'telephone', 'address']);
+
+            // Log update activity with changes
+            ActivityLogger::updated($client, ActivityLog::GROUP_CLIENTS, $oldValues, $newValues);
+
             DB::commit();
             return redirect()->route('admin.clients.index')
                 ->with('success', 'تم تحديث بيانات العميل بنجاح');
@@ -158,6 +173,9 @@ class ClientController extends Controller
     {
         DB::beginTransaction();
         try {
+            // Log delete activity before deleting
+            ActivityLogger::deleted($client, ActivityLog::GROUP_CLIENTS);
+
             $client->delete();
             DB::commit();
             return redirect()->route('admin.clients.index')
@@ -175,7 +193,35 @@ class ClientController extends Controller
             $q->whereNull('parent_id')->whereNotNull('barcode');
         }]);
 
+        // Log print activity
+        $totalPages = $client->files->sum('pages_count') ?: 1;
+        ActivityLogger::printed(
+            "طباعة باركود للعميل: {$client->name} ({$totalPages} صفحة)",
+            [$client->id],
+            ActivityLog::GROUP_CLIENTS
+        );
+
         return view('admin.clients.print-barcodes', compact('client'));
+    }
+
+    /**
+     * Log print activity for single client barcode (AJAX)
+     */
+    public function logPrint(Request $request)
+    {
+        $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'client_name' => 'required|string',
+            'pages_count' => 'required|integer|min:1',
+        ]);
+
+        ActivityLogger::printed(
+            "طباعة باركود للعميل: {$request->client_name} ({$request->pages_count} صفحة)",
+            [$request->client_id],
+            ActivityLog::GROUP_CLIENTS
+        );
+
+        return response()->json(['success' => true]);
     }
 
     /**
@@ -190,7 +236,18 @@ class ClientController extends Controller
 
         DB::beginTransaction();
         try {
+            // Get client names for logging
+            $clientNames = Client::whereIn('id', $request->client_ids)->pluck('name')->toArray();
+
             $count = Client::whereIn('id', $request->client_ids)->delete();
+
+            // Log bulk delete activity
+            ActivityLogger::bulkDeleted(
+                "حذف {$count} عميل: " . implode('، ', array_slice($clientNames, 0, 5)) . (count($clientNames) > 5 ? '...' : ''),
+                $request->client_ids,
+                ActivityLog::GROUP_CLIENTS
+            );
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -242,10 +299,18 @@ class ClientController extends Controller
             }
         }
 
+        // Log bulk print activity
+        $totalStickers = collect($data)->sum('pages_count');
+        ActivityLogger::printed(
+            "طباعة باركود جماعي: {$clients->count()} عميل ({$totalStickers} استيكر)",
+            $request->client_ids,
+            ActivityLog::GROUP_CLIENTS
+        );
+
         return response()->json([
             'success' => true,
             'data' => $data,
-            'total_stickers' => collect($data)->sum('pages_count')
+            'total_stickers' => $totalStickers
         ]);
     }
 
@@ -282,6 +347,13 @@ class ClientController extends Controller
         $client = Client::onlyTrashed()->findOrFail($id);
         $client->restore();
 
+        // Log restore activity
+        ActivityLogger::make()
+            ->action('restore', ActivityLog::GROUP_CLIENTS)
+            ->on($client)
+            ->description("استعادة العميل: {$client->name}")
+            ->log();
+
         return redirect()->back()->with('success', 'تم استعادة العميل بنجاح');
     }
 
@@ -293,6 +365,15 @@ class ClientController extends Controller
         DB::beginTransaction();
         try {
             $client = Client::onlyTrashed()->findOrFail($id);
+            $clientName = $client->name;
+
+            // Log force delete activity before deleting
+            ActivityLogger::make()
+                ->action('force_delete', ActivityLog::GROUP_CLIENTS)
+                ->description("حذف نهائي للعميل: {$clientName}")
+                ->withProperties(['client_id' => $id, 'client_name' => $clientName])
+                ->log();
+
             $client->forceDelete();
             DB::commit();
             return redirect()->back()->with('success', 'تم حذف العميل نهائياً');
@@ -314,7 +395,19 @@ class ClientController extends Controller
 
         DB::beginTransaction();
         try {
+            // Get client names for logging
+            $clientNames = Client::onlyTrashed()->whereIn('id', $request->client_ids)->pluck('name')->toArray();
+
             $count = Client::onlyTrashed()->whereIn('id', $request->client_ids)->forceDelete();
+
+            // Log bulk force delete activity
+            ActivityLogger::make()
+                ->action('bulk_force_delete', ActivityLog::GROUP_CLIENTS)
+                ->description("حذف نهائي لـ {$count} عميل: " . implode('، ', array_slice($clientNames, 0, 5)) . (count($clientNames) > 5 ? '...' : ''))
+                ->withAffectedIds($request->client_ids)
+                ->batch(null, $count)
+                ->log();
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -341,7 +434,19 @@ class ClientController extends Controller
 
         DB::beginTransaction();
         try {
+            // Get client names for logging
+            $clientNames = Client::onlyTrashed()->whereIn('id', $request->client_ids)->pluck('name')->toArray();
+
             $count = Client::onlyTrashed()->whereIn('id', $request->client_ids)->restore();
+
+            // Log bulk restore activity
+            ActivityLogger::make()
+                ->action('bulk_restore', ActivityLog::GROUP_CLIENTS)
+                ->description("استعادة {$count} عميل: " . implode('، ', array_slice($clientNames, 0, 5)) . (count($clientNames) > 5 ? '...' : ''))
+                ->withAffectedIds($request->client_ids)
+                ->batch(null, $count)
+                ->log();
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -469,6 +574,13 @@ class ClientController extends Controller
 
             // Generate filename with date
             $filename = 'clients_export_' . date('Y-m-d_His') . '.xlsx';
+
+            // Log export activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_EXPORT, ActivityLog::GROUP_CLIENTS)
+                ->description("تصدير بيانات العملاء ({$clients->count()} عميل)")
+                ->withProperties(['total_clients' => $clients->count(), 'filename' => $filename])
+                ->log();
 
             // Create response
             $writer = new Xlsx($spreadsheet);

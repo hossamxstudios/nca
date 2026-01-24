@@ -8,11 +8,11 @@
             </div>
             <div class="gap-2 d-flex">
                 @can('users.delete')
-                <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">
+                <button type="button" class="btn btn-sm btn-light text-danger" onclick="bulkDelete()">
                     <i class="ti ti-trash me-1"></i>حذف المحدد
                 </button>
                 @endcan
-                <button type="button" class="btn btn-sm btn-secondary" onclick="clearSelection()">
+                <button type="button" class="btn btn-sm btn-light text-primary" onclick="clearSelection()">
                     <i class="ti ti-x me-1"></i>إلغاء التحديد
                 </button>
             </div>
@@ -120,6 +120,11 @@
                                     <a href="{{ route('admin.users.show', $user->id) }}" class="px-2 btn btn-icon btn-sm bg-info-subtle text-info" title="عرض">
                                         <i class="ti ti-eye fs-5"></i>
                                     </a>
+                                    @can('activity-logs.view')
+                                    <a href="{{ route('admin.activity-logs.user-timeline', $user->id) }}" class="px-2 btn btn-icon btn-sm bg-secondary-subtle text-secondary" title="سجل النشاط">
+                                        <i class="ti ti-history fs-5"></i>
+                                    </a>
+                                    @endcan
                                     @can('users.edit')
                                     <button type="button" class="px-2 btn btn-icon btn-sm bg-warning-subtle text-warning" title="تعديل" data-bs-toggle="modal" data-bs-target="#editUserModal_{{ $user->id }}">
                                         <i class="ti ti-edit fs-5"></i>

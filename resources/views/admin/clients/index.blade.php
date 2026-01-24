@@ -1,11 +1,9 @@
 <!DOCTYPE html>
 @include('admin.main.html')
-
 <head>
     <title>إدارة العملاء - أرشيف القاهرة الجديدة</title>
     @include('admin.main.meta')
 </head>
-
 <body>
     <div class="wrapper">
         @include('admin.main.topbar')
@@ -21,14 +19,14 @@
         </div>
     </div>
     @can('clients.create')
-    @include('admin.clients.add-modal')
-    @include('admin.clients.add-file-modal')
+        @include('admin.clients.add-modal')
+        @include('admin.clients.add-file-modal')
     @endcan
     @can('clients.edit')
-    @include('admin.clients.edit-modal')
+        @include('admin.clients.edit-modal')
     @endcan
     @can('clients.delete')
-    @include('admin.clients.delete-modal')
+        @include('admin.clients.delete-modal')
     @endcan
     @include('admin.clients.print-barcode-modal')
     @include('admin.clients.scripts')

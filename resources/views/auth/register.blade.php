@@ -1,21 +1,21 @@
 <!DOCTYPE html>
-@include('dashboards.shared.html')
+@include('admin.main.html')
 
 <head>
-    @include('dashboards.shared.meta')
+    @include('admin.main.meta')
 </head>
 
 <body>
     <div class="wrapper">
-        <div class="auth-box overflow-hidden align-items-center d-flex">
+        <div class="overflow-hidden auth-box align-items-center d-flex">
             <div class="container">
                 <div class="row justify-content-center">
                     <div class="col-xxl-4 col-md-6 col-sm-8">
                         <div class="card">
                             <div class="card-body">
-                                <div class="auth-brand mb-4">
+                                <div class="mb-4 auth-brand">
                                     <a href="{{ route('login') }}" class="logo-dark">
-                                        <span class="d-flex align-items-center gap-1">
+                                        <span class="gap-1 d-flex align-items-center">
                                             {{-- <span class="avatar avatar-xs rounded-circle text-bg-dark">
                                                 <span class="avatar-title">
                                                     <i data-lucide="sparkles" class="fs-md"></i>
@@ -27,16 +27,16 @@
                                         </span>
                                     </a>
                                     <a href="{{ route('login') }}" class="logo-light">
-                                        <span class="d-flex align-items-center gap-1">
+                                        <span class="gap-1 d-flex align-items-center">
                                             <span class="avatar avatar-xs rounded-circle text-bg-dark">
                                                 <span class="avatar-title">
                                                     <i data-lucide="sparkles" class="fs-md"></i>
                                                 </span>
                                             </span>
-                                            <span class="logo-text text-white fw-bold fs-xl">Biry Suits</span>
+                                            <span class="text-white logo-text fw-bold fs-xl">Biry Suits</span>
                                         </span>
                                     </a>
-                                    <p class="text-muted w-lg-75 mt-3">Create your Biry Suits account to manage access and enjoy the
+                                    <p class="mt-3 text-muted w-lg-75">Create your Biry Suits account to manage access and enjoy the
                                         full admin experience.</p>
                                 </div>
 
@@ -110,12 +110,12 @@
                                         </div>
 
                                         <div class="d-grid">
-                                            <button type="submit" class="btn btn-primary fw-semibold py-2">Create
+                                            <button type="submit" class="py-2 btn btn-primary fw-semibold">Create
                                                 Account</button>
                                         </div>
                                     </form>
 
-                                    <p class="text-muted text-center mt-4 mb-0">
+                                    <p class="mt-4 mb-0 text-center text-muted">
                                         Already registered?
                                         <a href="{{ route('login') }}"
                                             class="text-decoration-underline link-offset-3 fw-semibold">Sign in
@@ -124,7 +124,7 @@
                                 </div>
                             </div>
                         </div>
-                        <p class="text-center text-muted mt-4 mb-0">
+                        <p class="mt-4 mb-0 text-center text-muted">
                             ©
                             <script>
                                 document.write(new Date().getFullYear())
@@ -135,7 +135,7 @@
             </div>
         </div>
     </div>
-    @include('dashboards.shared.scripts')
+    @include('admin.main.scripts')
 </body>
 
 </html>

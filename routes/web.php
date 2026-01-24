@@ -11,10 +11,13 @@ use App\Http\Controllers\Admin\ImportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\PageController;
+use App\Http\Controllers\Admin\ActivityLogController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
-Route::get('/login', [AuthenticatedSessionController::class, 'create']);
+Route::get('/login', [AuthenticatedSessionController::class, 'create'])->name('login');
+Route::post('/login', [AuthenticatedSessionController::class, 'store'])->name('login.store');
+Route::post('/logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [PageController::class, 'index'])->name('dashboard');
@@ -38,6 +41,7 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::get('/clients/{client}/delete'                               , [ClientController::class,              'confirmDelete'])->name('clients.delete');
     Route::delete('/clients/{client}'                                   , [ClientController::class,                    'destroy'])->name('clients.destroy');
     Route::get('/clients/{client}/print-barcodes'                       , [ClientController::class,              'printBarcodes'])->name('clients.print-barcodes');
+    Route::post('/clients/log-print'                                     , [ClientController::class,                   'logPrint'])->name('clients.log-print');
     Route::post('/clients/{id}/restore'                                 , [ClientController::class,                    'restore'])->name('clients.restore');
     Route::delete('/clients/{id}/force-delete'                          , [ClientController::class,                'forceDelete'])->name('clients.force-delete');
     // Files
@@ -129,6 +133,20 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::post('/profile'                                              , [ProfileController::class,                      'update'])->name('profile.update');
     Route::post('/profile/password'                                     , [ProfileController::class,              'updatePassword'])->name('profile.password');
     Route::post('/profile/avatar/remove'                                , [ProfileController::class,                'removeAvatar'])->name('profile.avatar.remove');
+    // Activity Logs
+    Route::middleware('can:activity-logs.view')->group(function () {
+        Route::get('/activity-logs'                                     , [ActivityLogController::class,                    'index'])->name('activity-logs.index');
+        Route::get('/activity-logs/user/{user}'                         , [ActivityLogController::class,             'userTimeline'])->name('activity-logs.user-timeline');
+        Route::get('/activity-logs/{activityLog}'                       , [ActivityLogController::class,                     'show'])->name('activity-logs.show');
+    });
+    Route::middleware('can:activity-logs.delete')->group(function () {
+        Route::post('/activity-logs/bulk-delete'                        , [ActivityLogController::class,               'bulkDelete'])->name('activity-logs.bulk-delete');
+        Route::post('/activity-logs/clear-old'                          , [ActivityLogController::class,                 'clearOld'])->name('activity-logs.clear-old');
+        Route::delete('/activity-logs/{activityLog}'                    , [ActivityLogController::class,                  'destroy'])->name('activity-logs.destroy');
+    });
 });
 
-require __DIR__.'/auth.php';
+Route::get('/test-error/{code}', function ($code) {
+    abort($code);
+});
+// require __DIR__.'/auth.php';

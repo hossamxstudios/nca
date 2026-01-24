@@ -17,6 +17,8 @@ use App\Models\Lane;
 use App\Models\Stand;
 use App\Models\Rack;
 use App\Jobs\ProcessImportJob;
+use App\Models\ActivityLog;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -91,6 +93,17 @@ class ImportController extends Controller
                 $request->boolean('skip_errors', true),
                 $request->boolean('update_existing', false)
             );
+
+            // Log import activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_BULK_IMPORT, ActivityLog::GROUP_IMPORTS)
+                ->on($import, $request->file('file')->getClientOriginalName())
+                ->description("بدء استيراد ملف: {$request->file('file')->getClientOriginalName()}")
+                ->withProperties([
+                    'type' => $request->type,
+                    'filename' => $request->file('file')->getClientOriginalName(),
+                ])
+                ->log();
 
             return redirect()->route('admin.imports.index')
                 ->with('success', 'تم رفع الملف بنجاح وجاري معالجته');
@@ -240,6 +253,13 @@ class ImportController extends Controller
                     ->with('error', 'لا يمكن حذف استيراد قيد المعالجة');
             }
 
+            // Log delete activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_DELETE, ActivityLog::GROUP_IMPORTS)
+                ->on($import, $import->original_filename)
+                ->description("حذف سجل استيراد: {$import->original_filename}")
+                ->log();
+
             $import->delete();
 
             return redirect()->route('admin.imports.index')
@@ -291,6 +311,13 @@ class ImportController extends Controller
 
         // Create response
         $filename = "import_template_{$type}_" . date('Y-m-d') . '.xlsx';
+
+        // Log download template activity
+        ActivityLogger::make()
+            ->action(ActivityLog::ACTION_EXPORT, ActivityLog::GROUP_IMPORTS)
+            ->description("تحميل قالب استيراد: {$type}")
+            ->withProperties(['type' => $type, 'filename' => $filename])
+            ->log();
 
         $writer = new Xlsx($spreadsheet);
 

@@ -1,5 +1,4 @@
 <div class="card">
-    {{-- Bulk Actions Bar (hidden by default) --}}
     <div id="bulkActionsBar" class="m-3 mb-0 alert alert-primary d-none">
         <div class="d-flex justify-content-between align-items-center">
             <div>
@@ -11,17 +10,16 @@
                     <i class="ti ti-printer me-1"></i>طباعة الباركود
                 </button>
                 @can('clients.delete')
-                <button type="button" class="btn btn-sm btn-danger" onclick="bulkDelete()">
+                <button type="button" class="btn btn-sm btn-light text-danger" onclick="bulkDelete()">
                     <i class="ti ti-trash me-1"></i>حذف المحدد
                 </button>
                 @endcan
-                <button type="button" class="btn btn-sm btn-secondary" onclick="clearSelection()">
+                <button type="button" class="btn btn-sm btn-light text-primary" onclick="clearSelection()">
                     <i class="ti ti-x me-1"></i>إلغاء التحديد
                 </button>
             </div>
         </div>
     </div>
-
     <div class="card-header d-flex justify-content-between align-items-center">
         <h5 class="mb-0 card-title">
             <i class="ti ti-table me-1"></i>قائمة العملاء
@@ -48,9 +46,7 @@
                 </thead>
                 <tbody>
                     @foreach($clients as $client)
-                    @php
-                        $filesCount = $client->files->count();
-                        $firstFile = $client->files->first();
+                    @php $filesCount = $client->files->count(); $firstFile = $client->files->first();
                     @endphp
                     <tr class="client-row">
                         <td rowspan="{{ $filesCount > 0 ? $filesCount : 1 }}">
@@ -67,24 +63,28 @@
                             <span class="badge bg-secondary-subtle text-secondary">{{ $firstFile->file_name }}</span>
                         </td>
                         <td>
-                            <div class="text-dark">
-                                @if($firstFile->land)
-                                ({{ $firstFile->land->district?->name ?? '-' }}) ->
-                                ({{ $firstFile->land->zone?->name ?? '-' }}) ->
-                                ({{ $firstFile->land->area?->name ?? '-' }}) ->
-                                ({{ $firstFile->land->land_no ?? '-' }})
-                                @else
-                                <span class="text-dark">-</span>
-                                @endif
+                            @if($firstFile->land)
+                            <div class="flex-wrap gap-1 d-flex">
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">الحي:</span> {{ $firstFile->land?->district?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المجاورة:</span> {{ $firstFile->land?->zone?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المنطقة:</span> {{ $firstFile->land?->area?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">القطعة:</span> {{ $firstFile->land?->land_no ?? '-' }}</span>
                             </div>
+                            @else
+                            <span class="text-muted">-</span>
+                            @endif
                         </td>
                         <td>
-                            <div class="text-dark">
-                               ( غرفة{{ $firstFile->room?->name ?? '-' }}) ->
-                               ( ممر{{ $firstFile->lane?->name ?? '-' }}) ->
-                               ( استاند{{ $firstFile->stand?->name ?? '-' }}) ->
-                               ( رف{{ $firstFile->rack?->name ?? '-' }})
+                            @if($firstFile->room || $firstFile->lane || $firstFile->stand || $firstFile->rack)
+                            <div class="flex-wrap gap-1 d-flex">
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">غرفة:</span> {{ $firstFile->room?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">ممر:</span> {{ $firstFile->lane?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">استاند:</span> {{ $firstFile->stand?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">رف:</span> {{ $firstFile->rack?->name }}</span>
                             </div>
+                            @else
+                            <span class="text-muted">-</span>
+                            @endif
                         </td>
                         <td class="text-center">
                             <span class="badge bg-info-subtle text-info">{{ $firstFile->pages_count ?? 0 }}</span>
@@ -108,11 +108,9 @@
                                     <i class="ti ti-file-plus fs-5"></i>
                                 </button>
                                 @endcan
-                                {{-- @if($filesWithBarcode->count() > 1) --}}
                                 <button type="button" class="px-2 btn btn-icon btn-sm bg-primary-subtle text-primary" title="طباعة" data-bs-toggle="modal" data-bs-target="#printBarcodeModal_{{ $client->id }}">
                                     <i class="ti ti-printer fs-5"></i>
                                 </button>
-                                {{-- @endif --}}
                                 <a href="{{ route('admin.clients.show', $client->id) }}" class="px-2 btn btn-icon btn-sm bg-info-subtle text-info" title="عرض">
                                     <i class="ti ti-eye fs-5"></i>
                                 </a>
@@ -132,21 +130,31 @@
                     @foreach($client->files->skip(1) as $file)
                     <tr class="file-subrow">
                         <td>
-                            <span class="badge bg-secondary-subtle text-secondary">{{ $file->file_name }}</span>
+                            <span class="badge bg-secondary-subtle text-secondary fs-6">{{ $file->file_name }}</span>
                         </td>
                         <td>
-                            <div class="text-dark">
-                                @if($file->land)
-                                ({{ $file->land->district?->name ?? '-' }}) -> ({{ $file->land->zone?->name ?? '-' }}) -> ({{ $file->land->area?->name ?? '-' }}) -> ({{ $file->land->land_no ?? '-' }})
-                                @else
-                                <span class="text-dark">-</span>
-                                @endif
+                            @if($file->land)
+                            <div class="flex-wrap gap-1 d-flex">
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">الحي:</span> {{ $file->land?->district?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المجاورة:</span> {{ $file->land?->zone?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المنطقة:</span> {{ $file->land?->area?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">القطعة:</span> {{ $file->land?->land_no ?? '-' }}</span>
                             </div>
+                            @else
+                                <span class="text-muted">-</span>
+                            @endif
                         </td>
                         <td>
-                            <div class="text-dark">
-                                (غرفة{{ $file->room?->name ?? '-' }})->(ممر{{ $file->lane?->name ?? '-' }})->(استاند{{ $file->stand?->name ?? '-' }})->(رف{{ $file->rack?->name ?? '-' }})
+                            @if($file->room || $file->lane || $file->stand || $file->rack)
+                            <div class="flex-wrap gap-1 d-flex">
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">غرفة:</span> {{ $file->room?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">ممر:</span> {{ $file->lane?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">استاند:</span> {{ $file->stand?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">رف:</span> {{ $file->rack?->name }}</span>
                             </div>
+                            @else
+                            <span class="text-muted">-</span>
+                            @endif
                         </td>
                         <td class="text-center">
                             <span class="badge bg-info-subtle text-info">{{ $file->pages_count ?? 0 }}</span>
@@ -176,16 +184,16 @@
                 </span>
             </div>
             @if(isset($requiresSearch) && $requiresSearch && !request('search') && !request('barcode'))
-            <h5 class="text-muted">ابحث عن عميل</h5>
-            <p class="mb-3 text-muted">يرجى استخدام البحث أو مسح الباركود للعثور على العملاء</p>
+                <h5 class="text-muted">ابحث عن عميل</h5>
+                <p class="mb-3 text-muted">يرجى استخدام البحث أو مسح الباركود للعثور على العملاء</p>
             @else
-            <h5 class="text-muted">لا يوجد عملاء</h5>
-            <p class="mb-3 text-muted">لم يتم العثور على أي عملاء مطابقين لمعايير البحث</p>
-            @can('clients.create')
-            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
-                <i class="ti ti-plus me-1"></i>إضافة عميل جديد
-            </button>
-            @endcan
+                <h5 class="text-muted">لا يوجد عملاء</h5>
+                <p class="mb-3 text-muted">لم يتم العثور على أي عملاء مطابقين لمعايير البحث</p>
+                @can('clients.create')
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                        <i class="ti ti-plus me-1"></i>إضافة عميل جديد
+                    </button>
+                @endcan
             @endif
         </div>
         @endif

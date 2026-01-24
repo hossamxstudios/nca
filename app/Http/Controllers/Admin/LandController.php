@@ -10,6 +10,8 @@ use App\Models\City;
 use App\Models\District;
 use App\Models\Zone;
 use App\Models\Area;
+use App\Models\ActivityLog;
+use App\Services\ActivityLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -101,7 +103,11 @@ class LandController extends Controller
 
         DB::beginTransaction();
         try {
-            Land::create($request->all());
+            $land = Land::create($request->all());
+
+            // Log create activity
+            ActivityLogger::created($land, ActivityLog::GROUP_GEOGRAPHIC, ['land_no' => $land->land_no]);
+
             DB::commit();
             return redirect()->route('admin.lands.index')->with('success', 'تم إضافة الأرض بنجاح');
         } catch (\Exception $e) {
@@ -144,7 +150,13 @@ class LandController extends Controller
 
         DB::beginTransaction();
         try {
+            $oldValues = $land->only(['land_no', 'unit_no', 'address']);
             $land->update($request->all());
+            $newValues = $land->only(['land_no', 'unit_no', 'address']);
+
+            // Log update activity
+            ActivityLogger::updated($land, ActivityLog::GROUP_GEOGRAPHIC, $oldValues, $newValues);
+
             DB::commit();
             return redirect()->route('admin.lands.index')->with('success', 'تم تحديث بيانات الأرض بنجاح');
         } catch (\Exception $e) {
@@ -160,6 +172,9 @@ class LandController extends Controller
     public function destroy(Land $land)
     {
         try {
+            // Log delete activity
+            ActivityLogger::deleted($land, ActivityLog::GROUP_GEOGRAPHIC);
+
             $land->delete();
             return redirect()->route('admin.lands.index')->with('success', 'تم حذف الأرض بنجاح');
         } catch (\Exception $e) {
@@ -176,6 +191,14 @@ class LandController extends Controller
         try {
             $land = Land::onlyTrashed()->findOrFail($id);
             $land->restore();
+
+            // Log restore activity
+            ActivityLogger::make()
+                ->action('restore', ActivityLog::GROUP_GEOGRAPHIC)
+                ->on($land)
+                ->description("استعادة الأرض: {$land->land_no}")
+                ->log();
+
             return redirect()->route('admin.lands.index')->with('success', 'تم استعادة الأرض بنجاح');
         } catch (\Exception $e) {
             Log::error('Land restore error: ' . $e->getMessage());
@@ -190,6 +213,15 @@ class LandController extends Controller
     {
         try {
             $land = Land::onlyTrashed()->findOrFail($id);
+            $landNo = $land->land_no;
+
+            // Log force delete activity
+            ActivityLogger::make()
+                ->action('force_delete', ActivityLog::GROUP_GEOGRAPHIC)
+                ->description("حذف نهائي للأرض: {$landNo}")
+                ->withProperties(['land_id' => $id, 'land_no' => $landNo])
+                ->log();
+
             $land->forceDelete();
             return redirect()->route('admin.lands.index')->with('success', 'تم حذف الأرض نهائياً');
         } catch (\Exception $e) {
@@ -206,7 +238,16 @@ class LandController extends Controller
         $request->validate(['ids' => 'required|array', 'ids.*' => 'exists:lands,id']);
 
         try {
+            $count = count($request->ids);
             Land::whereIn('id', $request->ids)->delete();
+
+            // Log bulk delete activity
+            ActivityLogger::bulkDeleted(
+                "حذف {$count} أرض",
+                $request->ids,
+                ActivityLog::GROUP_GEOGRAPHIC
+            );
+
             return response()->json(['success' => true, 'message' => 'تم حذف الأراضي المحددة بنجاح']);
         } catch (\Exception $e) {
             Log::error('Bulk delete lands error: ' . $e->getMessage());
@@ -222,7 +263,16 @@ class LandController extends Controller
         $request->validate(['ids' => 'required|array']);
 
         try {
-            Land::onlyTrashed()->whereIn('id', $request->ids)->restore();
+            $count = Land::onlyTrashed()->whereIn('id', $request->ids)->restore();
+
+            // Log bulk restore activity
+            ActivityLogger::make()
+                ->action('bulk_restore', ActivityLog::GROUP_GEOGRAPHIC)
+                ->description("استعادة {$count} أرض")
+                ->withAffectedIds($request->ids)
+                ->batch(null, $count)
+                ->log();
+
             return response()->json(['success' => true, 'message' => 'تم استعادة الأراضي المحددة بنجاح']);
         } catch (\Exception $e) {
             Log::error('Bulk restore lands error: ' . $e->getMessage());
@@ -238,6 +288,16 @@ class LandController extends Controller
         $request->validate(['ids' => 'required|array']);
 
         try {
+            $count = count($request->ids);
+
+            // Log bulk force delete activity
+            ActivityLogger::make()
+                ->action('bulk_force_delete', ActivityLog::GROUP_GEOGRAPHIC)
+                ->description("حذف نهائي لـ {$count} أرض")
+                ->withAffectedIds($request->ids)
+                ->batch(null, $count)
+                ->log();
+
             Land::onlyTrashed()->whereIn('id', $request->ids)->forceDelete();
             return response()->json(['success' => true, 'message' => 'تم حذف الأراضي نهائياً']);
         } catch (\Exception $e) {

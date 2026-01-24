@@ -42,9 +42,9 @@
                                 </div>
                                 <h4 class="mb-1 fw-semibold">{{ $role->name }}</h4>
                                 @if(in_array($role->name, ['super-admin', 'admin']))
-                                    <span class="badge bg-danger-subtle text-danger px-3 py-2">صلاحية نظام</span>
+                                    <span class="px-3 py-2 badge bg-danger-subtle text-danger">صلاحية نظام</span>
                                 @else
-                                    <span class="badge bg-primary-subtle text-primary px-3 py-2">صلاحية مخصصة</span>
+                                    <span class="px-3 py-2 badge bg-primary-subtle text-primary">صلاحية مخصصة</span>
                                 @endif
                             </div>
                             <div class="pt-0 card-body">
@@ -143,7 +143,7 @@
                                                         $permNameAr = $actionTranslations[$action] ?? $action ?: $permName;
                                                     @endphp
                                                     <div class="col-md-4 col-sm-6">
-                                                        <span class="badge bg-success-subtle text-success">
+                                                        <span class="badge bg-success-subtle text-success fs-5">
                                                             <i class="ti ti-check me-1"></i>{{ $permNameAr }}
                                                         </span>
                                                     </div>
