@@ -123,11 +123,14 @@ class ImportController extends Controller
             foreach ($import->errors as $row => $error) {
                 $formattedErrors[] = [
                     'row' => $row,
+                    'sheet' => 'Sheet1',
                     'client' => '-',
                     'land' => '-',
                     'file' => '-',
+                    'file_name' => '-',
                     'location' => '-',
                     'error' => is_string($error) ? $error : json_encode($error),
+                    'error_type' => 'danger',
                 ];
             }
         }

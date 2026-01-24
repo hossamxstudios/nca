@@ -168,13 +168,17 @@ class File extends Model implements HasMedia
 
     /**
      * Generate a unique barcode for the file
-     * Format: Unix timestamp (13 digits with milliseconds)
+     * Format: 8-character alphanumeric (base36 timestamp + random)
+     * Example: A7X9K2M4
      */
     public static function generateBarcode(): string
     {
         do {
-            // Unix timestamp with milliseconds for uniqueness
-            $barcode = (string) round(microtime(true));
+            // Base36 encode of microseconds + random for short unique code
+            $micro = (int) (microtime(true) * 10000) % 100000000;
+            $random = mt_rand(0, 1679615); // max base36 4-char = ZZZZ
+            $barcode = strtoupper(base_convert($micro, 10, 36) . base_convert($random, 10, 36));
+            $barcode = substr(str_pad($barcode, 8, '0', STR_PAD_LEFT), 0, 8);
         } while (self::where('barcode', $barcode)->exists());
 
         return $barcode;

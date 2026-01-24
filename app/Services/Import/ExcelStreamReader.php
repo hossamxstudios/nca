@@ -122,13 +122,21 @@ class ExcelStreamReader
             $worksheet = $spreadsheet->getActiveSheet();
 
             $rows = [];
+
+            // Use toArray() like the old working code
+            $allRows = $worksheet->toArray();
+
             for ($row = $startRow; $row <= $endRow; $row++) {
+                $rowIndex = $row - 1; // toArray is 0-indexed
+                if (!isset($allRows[$rowIndex])) {
+                    continue;
+                }
+
                 $rowData = [];
                 $hasData = false;
 
                 foreach ($headers as $colIndex => $header) {
-                    $colLetter = $this->getColumnLetter($colIndex);
-                    $cellValue = $worksheet->getCell($colLetter . $row)->getValue();
+                    $cellValue = $allRows[$rowIndex][$colIndex] ?? null;
                     $rowData[$header] = $this->cleanValue($cellValue);
 
                     if (!empty($rowData[$header])) {

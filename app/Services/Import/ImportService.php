@@ -200,10 +200,12 @@ class ImportService
                     $this->failedCount++;
 
                     $rowNumber = $row['_excel_row'] ?? ($index + 1);
-                    $chunkErrors[$rowNumber] = $e->getMessage();
-                    $this->errors[$rowNumber] = $e->getMessage();
+                    // Sanitize error message to valid UTF-8
+                    $errorMsg = $this->sanitizeUtf8($e->getMessage());
+                    $chunkErrors[$rowNumber] = $errorMsg;
+                    $this->errors[$rowNumber] = $errorMsg;
 
-                    Log::warning("[Import] Row {$rowNumber} failed: " . $e->getMessage());
+                    Log::warning("[Import] Row {$rowNumber} failed: " . $errorMsg);
 
                     if (!$this->skipErrors) {
                         throw $e;
@@ -237,7 +239,9 @@ class ImportService
         $normalized = [];
 
         foreach ($row as $key => $value) {
-            $normalizedKey = self::HEADER_MAP[$key] ?? $key;
+            // Trim the key to remove any trailing/leading spaces
+            $trimmedKey = trim($key);
+            $normalizedKey = self::HEADER_MAP[$trimmedKey] ?? $trimmedKey;
             $normalized[$normalizedKey] = $this->cleanValue($value);
         }
 
@@ -260,11 +264,44 @@ class ImportService
 
         $value = trim((string) $value);
 
-        if ($value === '' || strtolower($value) === 'null' || $value === 'لا يوجد') {
+        if ($value === '' || strtolower($value) === 'null') {
             return null;
         }
 
+        // Remove invalid UTF-8 bytes
+        $value = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
         return $value;
+    }
+
+    /**
+     * Sanitize string to valid UTF-8.
+     */
+    private function sanitizeUtf8(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        // If already valid UTF-8, return as-is
+        if (mb_check_encoding($value, 'UTF-8')) {
+            // Just remove control characters
+            $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value);
+            return $value ?: null;
+        }
+
+        // Try to convert from common encodings
+        $value = mb_convert_encoding($value, 'UTF-8', 'UTF-8');
+
+        // If still invalid, use iconv to strip bad bytes
+        if (!mb_check_encoding($value, 'UTF-8')) {
+            $value = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        }
+
+        // Remove control characters
+        $value = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value);
+
+        return $value ?: null;
     }
 
     /**
@@ -273,33 +310,46 @@ class ImportService
      */
     private function processArchiveRow(array $row): void
     {
-        // Skip rows without useful data
-        $fileName = $row['file_name'] ?? null;
-        if (empty($fileName) || $fileName === 'لا يوجد') {
-            return;
+        // Handle multiple possible field names (Arabic headers or pre-mapped English)
+        $fileName = $row['file_name'] ?? $row['file_name_col'] ?? $row['الملف'] ?? null;
+        $clientName = $row['client_name'] ?? $row['owner_name'] ?? $row['المالك'] ?? 'غير معروف';
+        $landNo = $row['land_no'] ?? $row['القطعه'] ?? $row['القطعة'] ?? null;
+        $districtName = $row['district'] ?? $row['الحي'] ?? $row['الحى'] ?? 'غير محدد';
+        $zoneName = $row['zone'] ?? $row['المنطقة'] ?? 'غير محدد';
+        $areaName = $row['area'] ?? $row['المجاورة'] ?? 'غير محدد';
+        $roomName = $row['room'] ?? $row['الاوضة'] ?? $row['الوحدة'] ?? null;
+        $laneName = $row['lane'] ?? $row['الممر'] ?? null;
+        $standName = $row['stand'] ?? $row['الاستند'] ?? null;
+        $rackName = $row['rack'] ?? $row['الرف'] ?? null;
+
+        // Set defaults for empty values
+        if (empty($fileName)) {
+            $fileName = 'لا يوجد';
+        }
+        if (empty($landNo)) {
+            $landNo = 'غير محدد';
         }
 
         // Get or create geographic hierarchy
         $governorate = $this->getOrCreateGovernorate('القاهرة الجديدة');
         $city = $this->getOrCreateCity($governorate->id, 'القاهرة الجديدة');
-        $district = $this->getOrCreateDistrict($city->id, $row['district'] ?? 'غير محدد');
-        $zone = $this->getOrCreateZone($district->id, $row['zone'] ?? 'غير محدد');
-        $area = $this->getOrCreateArea($zone->id, $row['area'] ?? 'غير محدد');
+        $district = $this->getOrCreateDistrict($city->id, $districtName);
+        $zone = $this->getOrCreateZone($district->id, $zoneName);
+        $area = $this->getOrCreateArea($zone->id, $areaName);
 
         // Get or create physical location hierarchy
-        $room = $this->getOrCreateRoom($row['room'] ?? null);
-        $lane = $room ? $this->getOrCreateLane($room->id, $row['lane'] ?? null) : null;
-        $stand = $lane ? $this->getOrCreateStand($lane->id, $row['stand'] ?? null) : null;
-        $rack = $stand ? $this->getOrCreateRack($stand->id, $row['rack'] ?? null) : null;
+        $room = $this->getOrCreateRoom($roomName);
+        $lane = $room ? $this->getOrCreateLane($room->id, $laneName) : null;
+        $stand = $lane ? $this->getOrCreateStand($lane->id, $standName) : null;
+        $rack = $stand ? $this->getOrCreateRack($stand->id, $rackName) : null;
 
         // Get or create client
-        $clientName = $row['client_name'] ?? 'غير معروف';
         $client = $this->getOrCreateClient($clientName, $row['_excel_row'] ?? null);
 
         // Parse land numbers (can be comma-separated or range like "1-5")
-        $landNumbers = $this->parseLandNumbers($row['land_no'] ?? null);
+        $landNumbers = $this->parseLandNumbers($landNo);
 
-        foreach ($landNumbers as $landNo) {
+        foreach ($landNumbers as $parsedLandNo) {
             // Get or create land
             $land = $this->getOrCreateLand([
                 'client_id' => $client->id,
@@ -312,7 +362,7 @@ class ImportService
                 'lane_id' => $lane?->id,
                 'stand_id' => $stand?->id,
                 'rack_id' => $rack?->id,
-                'land_no' => $landNo,
+                'land_no' => $parsedLandNo,
             ]);
 
             // Create file record
@@ -478,7 +528,10 @@ class ImportService
             return $this->roomsCache->get($name);
         }
 
-        $room = Room::firstOrCreate(['name' => $name]);
+        $room = Room::firstOrCreate(
+            ['name' => $name],
+            ['building_name' => 'المبنى الرئيسي']
+        );
         $this->roomsCache->put($name, $room);
 
         return $room;
@@ -567,7 +620,8 @@ class ImportService
 
     private function getOrCreateLand(array $data): Land
     {
-        $key = $data['client_id'] . ':' . ($data['land_no'] ?? '') . ':' . ($data['governorate_id'] ?? 0);
+        $landNo = $data['land_no'] ?? 'غير محدد';
+        $key = $data['client_id'] . ':' . $landNo . ':' . ($data['governorate_id'] ?? 0);
 
         if ($this->landsCache->has($key)) {
             return $this->landsCache->get($key);
@@ -576,7 +630,7 @@ class ImportService
         $land = Land::firstOrCreate(
             [
                 'client_id' => $data['client_id'],
-                'land_no' => $data['land_no'] ?? 'غير محدد',
+                'land_no' => $landNo,
                 'governorate_id' => $data['governorate_id'] ?? null,
             ],
             $data
@@ -632,8 +686,7 @@ class ImportService
     }
 
     /**
-     * Parse land numbers that may be comma-separated or ranges.
-     * Examples: "1,2,3" or "1-5" or "1, 2, 3-5"
+     * Parse land numbers - just return as-is to preserve Arabic text.
      */
     private function parseLandNumbers(?string $landNo): array
     {
@@ -641,26 +694,8 @@ class ImportService
             return ['غير محدد'];
         }
 
-        $numbers = [];
-        $parts = preg_split('/[,،\s]+/', $landNo);
-
-        foreach ($parts as $part) {
-            $part = trim($part);
-            if (empty($part)) continue;
-
-            // Check for range (e.g., "1-5")
-            if (preg_match('/^(\d+)\s*[-–]\s*(\d+)$/', $part, $matches)) {
-                $start = (int) $matches[1];
-                $end = (int) $matches[2];
-                for ($i = $start; $i <= $end; $i++) {
-                    $numbers[] = (string) $i;
-                }
-            } else {
-                $numbers[] = $part;
-            }
-        }
-
-        return empty($numbers) ? ['غير محدد'] : array_unique($numbers);
+        // Return as-is to preserve Arabic text exactly
+        return [trim($landNo)];
     }
 
     /**
