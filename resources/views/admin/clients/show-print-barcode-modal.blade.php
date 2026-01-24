@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!svg.hasChildNodes()) {
                     JsBarcode(svg, svg.dataset.barcode, {
                         format: 'CODE128',
-                        width: 1.2,
+                        width: 1,
                         height: 35,
                         displayValue: false,
                         margin: 0

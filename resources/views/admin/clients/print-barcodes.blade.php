@@ -171,7 +171,7 @@
             @if($file->barcode)
             JsBarcode("#barcode-{{ $file->id }}", "{{ $file->barcode }}", {
                 format: "CODE128",
-                width: 2,
+                width: 1,
                 height: 50,
                 displayValue: false
             });

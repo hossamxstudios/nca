@@ -275,7 +275,7 @@
                     if (!svg.hasChildNodes()) {
                         JsBarcode(svg, svg.dataset.barcode, {
                             format: 'CODE128',
-                            width: 1.2,
+                            width: 1,
                             height: 35,
                             displayValue: false,
                             margin: 0
@@ -308,7 +308,7 @@
                     tempContainer.appendChild(svg);
                     JsBarcode(`#singleClientBarcode_${index}`, file.barcode, {
                         format: "CODE128",
-                        width: 1.2,
+                        width: 1,
                         height: 35,
                         displayValue: false,
                         margin: 0
@@ -392,7 +392,7 @@
                     setTimeout(() => {
                         JsBarcode(`#barcodeSvg_multi_${index}`, file.barcode, {
                             format: 'CODE128',
-                            width: 1.2,
+                            width: 1,
                             height: 35,
                             displayValue: false,
                             margin: 0

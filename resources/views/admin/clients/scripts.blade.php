@@ -155,7 +155,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             JsBarcode(`#bulkBarcode_${index}`, file.barcode, {
                 format: "CODE128",
-                width: 1.2,
+                width: 1,
                 height: 35,
                 displayValue: false,
                 margin: 0
