@@ -120,7 +120,7 @@ class ClientController extends Controller
         ]);
 
         // Log view activity (skip if viewed within last 3 minutes)
-        $recentView = ActivityLog::where('user_id', Auth::user()->id())
+        $recentView = ActivityLog::where('user_id', Auth::id())
             ->where('action_type', ActivityLog::ACTION_VIEW)
             ->where('subject_type', Client::class)
             ->where('subject_id', $client->id)
