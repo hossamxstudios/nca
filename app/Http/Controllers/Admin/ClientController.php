@@ -20,6 +20,7 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Border;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
+use Illuminate\Support\Facades\Auth;
 
 class ClientController extends Controller
 {
@@ -119,7 +120,7 @@ class ClientController extends Controller
         ]);
 
         // Log view activity (skip if viewed within last 3 minutes)
-        $recentView = ActivityLog::where('user_id', auth()->id())
+        $recentView = ActivityLog::where('user_id', Auth::user()->id())
             ->where('action_type', ActivityLog::ACTION_VIEW)
             ->where('subject_type', Client::class)
             ->where('subject_id', $client->id)
