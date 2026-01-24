@@ -32,9 +32,21 @@ class ProcessImportJob implements ShouldQueue
 
     public $currentRowNumber = 0;
     public $currentSheetName = '';
-    public $lastKnownOwnerName = null; // Track owner name for merged cells
-    public $lastKnownFileName = null; // Track file name for merged cells
-    public $lastKnownFileNumber = null; // Track file number for merged cells
+    public $lastKnownOwnerName = null;
+    public $lastKnownFileName = null;
+    public $lastKnownFileNumber = null;
+
+    // Caches for faster lookups
+    protected $governorateCache = [];
+    protected $cityCache = [];
+    protected $districtCache = [];
+    protected $zoneCache = [];
+    protected $areaCache = [];
+    protected $roomCache = [];
+    protected $laneCache = [];
+    protected $standCache = [];
+    protected $rackCache = [];
+    protected $clientCache = [];
 
     public function __construct(
         public Import $import,
@@ -84,7 +96,7 @@ class ProcessImportJob implements ShouldQueue
             $this->import->update(['total_rows' => $totalRows]);
 
             $processedRows = 0;
-            $chunkSize = 100; // Process 100 rows at a time
+            $chunkSize = 500; // Process 500 rows at a time
 
             // Process each sheet
             foreach ($allSheets as $sheetIndex => $worksheet) {
@@ -149,15 +161,14 @@ class ProcessImportJob implements ShouldQueue
 
                         DB::commit();
 
-                        // Update progress after each chunk
-                        $this->import->update([
-                            'processed_rows' => $processedRows,
-                            'success_rows' => $successCount,
-                            'failed_rows' => $failedCount,
-                        ]);
-
-                        // Free memory
-                        gc_collect_cycles();
+                        // Update progress every 5 chunks (2500 rows)
+                        if ($processedRows % 2500 < $chunkSize) {
+                            $this->import->update([
+                                'processed_rows' => $processedRows,
+                                'success_rows' => $successCount,
+                                'failed_rows' => $failedCount,
+                            ]);
+                        }
 
                     } catch (\Exception $e) {
                         DB::rollBack();
@@ -324,43 +335,63 @@ class ProcessImportJob implements ShouldQueue
     private function findOrCreateGovernorate(?string $name): ?Governorate
     {
         if (empty($name)) return null;
-        return Governorate::firstOrCreate(['name' => trim($name)]);
+        $key = trim($name);
+        if (!isset($this->governorateCache[$key])) {
+            $this->governorateCache[$key] = Governorate::firstOrCreate(['name' => $key]);
+        }
+        return $this->governorateCache[$key];
     }
 
     private function findOrCreateCity(?string $name, ?Governorate $governorate): ?City
     {
         if (empty($name) || !$governorate) return null;
-        return City::firstOrCreate([
-            'governorate_id' => $governorate->id,
-            'name' => trim($name),
-        ]);
+        $key = $governorate->id . '_' . trim($name);
+        if (!isset($this->cityCache[$key])) {
+            $this->cityCache[$key] = City::firstOrCreate([
+                'governorate_id' => $governorate->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->cityCache[$key];
     }
 
     private function findOrCreateDistrict(?string $name, ?City $city): ?District
     {
         if (empty($name) || !$city) return null;
-        return District::firstOrCreate([
-            'city_id' => $city->id,
-            'name' => trim($name),
-        ]);
+        $key = $city->id . '_' . trim($name);
+        if (!isset($this->districtCache[$key])) {
+            $this->districtCache[$key] = District::firstOrCreate([
+                'city_id' => $city->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->districtCache[$key];
     }
 
     private function findOrCreateZone(?string $name, ?District $district): ?Zone
     {
         if (empty($name) || !$district) return null;
-        return Zone::firstOrCreate([
-            'district_id' => $district->id,
-            'name' => trim($name),
-        ]);
+        $key = $district->id . '_' . trim($name);
+        if (!isset($this->zoneCache[$key])) {
+            $this->zoneCache[$key] = Zone::firstOrCreate([
+                'district_id' => $district->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->zoneCache[$key];
     }
 
     private function findOrCreateArea(?string $name, ?Zone $zone): ?Area
     {
         if (empty($name) || !$zone) return null;
-        return Area::firstOrCreate([
-            'zone_id' => $zone->id,
-            'name' => trim($name),
-        ]);
+        $key = $zone->id . '_' . trim($name);
+        if (!isset($this->areaCache[$key])) {
+            $this->areaCache[$key] = Area::firstOrCreate([
+                'zone_id' => $zone->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->areaCache[$key];
     }
 
     /**
@@ -370,8 +401,6 @@ class ProcessImportJob implements ShouldQueue
      */
     private function processArchiveRow(array $row): void
     {
-        // Log raw row data for debugging
-        Log::debug("Processing archive row", ['row_data' => $row]);
 
         // Map keys - headers are now mapped by mapArabicHeaders()
         $fileNumber = $row['file_number'] ?? null;
@@ -410,10 +439,6 @@ class ProcessImportJob implements ShouldQueue
         // Handle merged cells: if owner_name is still empty, use last known owner name
         if (empty($ownerName) && !empty($this->lastKnownOwnerName)) {
             $ownerName = $this->lastKnownOwnerName;
-            Log::debug("Using last known owner name for merged cell", [
-                'row_number' => $this->currentRowNumber,
-                'owner_name' => $ownerName,
-            ]);
         }
 
         // If owner name is still empty, use default name
@@ -427,10 +452,6 @@ class ProcessImportJob implements ShouldQueue
         // Handle merged cells for file name and file number
         if (empty($fileNameCol) && !empty($this->lastKnownFileName)) {
             $fileNameCol = $this->lastKnownFileName;
-            Log::debug("Using last known file name for merged cell", [
-                'row_number' => $this->currentRowNumber,
-                'file_name' => $fileNameCol,
-            ]);
         }
 
         if (empty($fileNumber) && !empty($this->lastKnownFileNumber)) {
@@ -445,34 +466,29 @@ class ProcessImportJob implements ShouldQueue
             $this->lastKnownFileNumber = $fileNumber;
         }
 
-        // Find or create client
-        $clientData = [
-            'name' => trim($ownerName),
-            'excel_row_number' => $this->currentRowNumber,
-        ];
+        // Find or create client with caching
+        $clientKey = trim($ownerName);
+        if (!isset($this->clientCache[$clientKey])) {
+            $this->clientCache[$clientKey] = Client::firstOrCreate(
+                ['name' => $clientKey],
+                ['name' => $clientKey, 'excel_row_number' => $this->currentRowNumber]
+            );
+        }
+        $client = $this->clientCache[$clientKey];
 
-        $client = Client::firstOrCreate(
-            ['name' => trim($ownerName)],
-            $clientData
-        );
-
-        // Update client files_code if file number provided
+        // Update client files_code if file number provided (skip if already has it)
         if (!empty($fileNumber)) {
             $filesCodes = $client->files_code ?? [];
             if (!in_array($fileNumber, $filesCodes)) {
                 $filesCodes[] = $fileNumber;
                 $client->update(['files_code' => $filesCodes]);
+                $this->clientCache[$clientKey] = $client->fresh();
             }
         }
 
-        // Get governorate - use provided or default to القاهرة
-        $governorate = Governorate::firstOrCreate(['name' => trim($governorateName ?? 'القاهرة')]);
-
-        // Get default city (القاهرة الجديدة) - can be expanded later
-        $city = City::firstOrCreate([
-            'governorate_id' => $governorate->id,
-            'name' => 'القاهرة الجديدة',
-        ]);
+        // Get governorate and city with caching
+        $governorate = $this->findOrCreateGovernorate($governorateName ?? 'القاهرة');
+        $city = $this->findOrCreateCity('القاهرة الجديدة', $governorate);
 
         // Find or create geographic hierarchy
         $district = $this->findOrCreateDistrict($districtName, $city);
@@ -571,17 +587,6 @@ class ProcessImportJob implements ShouldQueue
             }
         }
 
-        Log::debug("Archive import row processed", [
-            'client' => $ownerName,
-            'lands_created' => count($lands),
-            'land_numbers' => array_map(fn($l) => $l->land_no, $lands),
-            'file_name' => $fileName,
-            'file_created' => !empty($lands),
-            'room' => $roomName,
-            'lane' => $laneName,
-            'stand' => $standName,
-            'rack' => $rackName,
-        ]);
     }
 
     /**
@@ -668,37 +673,53 @@ class ProcessImportJob implements ShouldQueue
     private function findOrCreateRoom(?string $name): ?Room
     {
         if (empty($name)) return null;
-        return Room::firstOrCreate(
-            ['name' => trim($name)],
-            ['name' => trim($name), 'building_name' => 'المبنى الرئيسي']
-        );
+        $key = trim($name);
+        if (!isset($this->roomCache[$key])) {
+            $this->roomCache[$key] = Room::firstOrCreate(
+                ['name' => $key],
+                ['name' => $key, 'building_name' => 'المبنى الرئيسي']
+            );
+        }
+        return $this->roomCache[$key];
     }
 
     private function findOrCreateLane(?string $name, ?Room $room): ?Lane
     {
         if (empty($name) || !$room) return null;
-        return Lane::firstOrCreate([
-            'room_id' => $room->id,
-            'name' => trim($name),
-        ]);
+        $key = $room->id . '_' . trim($name);
+        if (!isset($this->laneCache[$key])) {
+            $this->laneCache[$key] = Lane::firstOrCreate([
+                'room_id' => $room->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->laneCache[$key];
     }
 
     private function findOrCreateStand(?string $name, ?Lane $lane): ?Stand
     {
         if (empty($name) || !$lane) return null;
-        return Stand::firstOrCreate([
-            'lane_id' => $lane->id,
-            'name' => trim($name),
-        ]);
+        $key = $lane->id . '_' . trim($name);
+        if (!isset($this->standCache[$key])) {
+            $this->standCache[$key] = Stand::firstOrCreate([
+                'lane_id' => $lane->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->standCache[$key];
     }
 
     private function findOrCreateRack(?string $name, ?Stand $stand): ?Rack
     {
         if (empty($name) || !$stand) return null;
-        return Rack::firstOrCreate([
-            'stand_id' => $stand->id,
-            'name' => trim($name),
-        ]);
+        $key = $stand->id . '_' . trim($name);
+        if (!isset($this->rackCache[$key])) {
+            $this->rackCache[$key] = Rack::firstOrCreate([
+                'stand_id' => $stand->id,
+                'name' => trim($name),
+            ]);
+        }
+        return $this->rackCache[$key];
     }
 
     public function failed(\Throwable $exception): void
