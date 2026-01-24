@@ -117,8 +117,24 @@ class ImportController extends Controller
     {
         $import->load('user');
 
+        // Format errors for display
+        $formattedErrors = [];
+        if (!empty($import->errors) && is_array($import->errors)) {
+            foreach ($import->errors as $row => $error) {
+                $formattedErrors[] = [
+                    'row' => $row,
+                    'client' => '-',
+                    'land' => '-',
+                    'file' => '-',
+                    'location' => '-',
+                    'error' => is_string($error) ? $error : json_encode($error),
+                ];
+            }
+        }
+
         return view('admin.imports.show', [
             'import' => $import,
+            'formattedErrors' => $formattedErrors,
         ]);
     }
 
