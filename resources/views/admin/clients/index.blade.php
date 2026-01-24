@@ -29,6 +29,7 @@
         @include('admin.clients.delete-modal')
     @endcan
     @include('admin.clients.print-barcode-modal')
+    @include('admin.clients.print-type-modal')
     @include('admin.clients.scripts')
     @include('admin.main.scripts')
 </body>

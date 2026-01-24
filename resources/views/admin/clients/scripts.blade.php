@@ -118,14 +118,28 @@ document.addEventListener('DOMContentLoaded', function() {
     // Show bulk print options modal
     function showBulkPrintOptionsModal(filesData, totalStickers) {
         const filesCount = filesData.length;
-        const choice = confirm(
-            `اختر نوع الطباعة:\n\n` +
-            `اضغط "موافق" لطباعة كل الصفحات (${totalStickers} استيكر)\n` +
-            `اضغط "إلغاء" لطباعة أول صفحة فقط لكل ملف (${filesCount} استيكر)`
-        );
 
-        printBulkBarcodes(filesData, totalStickers, choice ? 'all' : 'first');
+        // Store data for later use
+        window._printFilesData = filesData;
+        window._printTotalStickers = totalStickers;
+
+        // Update modal content
+        document.getElementById('printAllCount').textContent = totalStickers;
+        document.getElementById('printFirstCount').textContent = filesCount;
+        document.getElementById('printFilesCount').textContent = filesCount;
+
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('printTypeModal'));
+        modal.show();
     }
+
+    // Handle print type selection
+    window.selectPrintType = function(type) {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('printTypeModal'));
+        modal.hide();
+
+        printBulkBarcodes(window._printFilesData, window._printTotalStickers, type);
+    };
 
     // Print bulk barcodes
     function printBulkBarcodes(filesData, totalStickers, printOption = 'all') {
