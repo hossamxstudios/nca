@@ -28,25 +28,13 @@ class ProcessImportJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
-    public $timeout = 3600;
+    public $timeout = 0; // No timeout limit
 
     public $currentRowNumber = 0;
     public $currentSheetName = '';
-    public $lastKnownOwnerName = null;
-    public $lastKnownFileName = null;
-    public $lastKnownFileNumber = null;
-
-    // Caches for faster lookups
-    protected $governorateCache = [];
-    protected $cityCache = [];
-    protected $districtCache = [];
-    protected $zoneCache = [];
-    protected $areaCache = [];
-    protected $roomCache = [];
-    protected $laneCache = [];
-    protected $standCache = [];
-    protected $rackCache = [];
-    protected $clientCache = [];
+    public $lastKnownOwnerName = null; // Track owner name for merged cells
+    public $lastKnownFileName = null; // Track file name for merged cells
+    public $lastKnownFileNumber = null; // Track file number for merged cells
 
     public function __construct(
         public Import $import,
@@ -57,22 +45,18 @@ class ProcessImportJob implements ShouldQueue
     public function handle(): void
     {
         // Increase limits for large imports
-        set_time_limit(0); // No time limit
-        ini_set('memory_limit', '1G');
-
-        // Disable query log to save memory
-        DB::disableQueryLog();
+        set_time_limit(0);
+        ini_set('memory_limit', '6G');
 
         try {
+            // Log::info("ProcessImportJob started for import ID: {$this->import->id}");
+
             $media = $this->import->getFirstMedia('imports');
             if (!$media) {
                 throw new \Exception('Import file not found');
             }
 
-            // Use memory-efficient reader
-            $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReaderForFile($media->getPath());
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($media->getPath());
+            $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($media->getPath());
 
             // Process all sheets in the workbook
             $allSheets = $spreadsheet->getAllSheets();
@@ -95,112 +79,116 @@ class ProcessImportJob implements ShouldQueue
 
             $this->import->update(['total_rows' => $totalRows]);
 
-            $processedRows = 0;
-            $chunkSize = 500; // Process 500 rows at a time
+            DB::beginTransaction();
 
-            // Process each sheet
-            foreach ($allSheets as $sheetIndex => $worksheet) {
-                $sheetName = $worksheet->getTitle();
-                Log::info("Processing sheet: {$sheetName}");
+            try {
+                $processedRows = 0;
 
-                // Reset last known values for each sheet
-                $this->lastKnownOwnerName = null;
-                $this->lastKnownFileName = null;
-                $this->lastKnownFileNumber = null;
+                // Process each sheet
+                foreach ($allSheets as $sheetIndex => $worksheet) {
+                    $sheetName = $worksheet->getTitle();
+                    Log::info("Processing sheet: {$sheetName}");
 
-                $rows = $worksheet->toArray();
+                    // Reset last known values for each sheet
+                    $this->lastKnownOwnerName = null;
+                    $this->lastKnownFileName = null;
+                    $this->lastKnownFileNumber = null;
 
-                if (count($rows) < 2) {
-                    Log::info("Sheet {$sheetName} has no data rows, skipping");
-                    continue;
-                }
+                    $rows = $worksheet->toArray();
 
-                $rawHeaders = array_map(fn($h) => trim($h ?? ''), $rows[0]);
-                $headers = $this->mapArabicHeaders($rawHeaders);
-                $dataRows = array_slice($rows, 1);
+                    if (count($rows) < 2) {
+                        Log::info("Sheet {$sheetName} has no data rows, skipping");
+                        continue;
+                    }
 
-                // Process in chunks
-                $chunks = array_chunk($dataRows, $chunkSize, true);
+                    $rawHeaders = array_map(fn($h) => trim($h ?? ''), $rows[0]);
+                    $headers = $this->mapArabicHeaders($rawHeaders);
+                    $dataRows = array_slice($rows, 1);
 
-                foreach ($chunks as $chunk) {
-                    DB::beginTransaction();
+                    Log::debug("Import headers mapping", [
+                        'raw_headers' => $rawHeaders,
+                        'mapped_headers' => $headers,
+                    ]);
 
-                    try {
-                        foreach ($chunk as $index => $row) {
-                            $rowNumber = $index + 2;
-                            $this->currentRowNumber = $rowNumber;
-                            $this->currentSheetName = $sheetName;
-                            $rowData = array_combine($headers, $row);
+                    foreach ($dataRows as $index => $row) {
+                        $rowNumber = $index + 2;
+                        $this->currentRowNumber = $rowNumber;
+                        $this->currentSheetName = $sheetName;
+                        $rowData = array_combine($headers, $row);
 
-                            $rowData['_raw_headers'] = $rawHeaders;
-                            $rowData['_headers_map'] = array_combine($headers, $rawHeaders);
+                        // Add raw headers for reference (to extract owner name from header)
+                        $rowData['_raw_headers'] = $rawHeaders;
+                        $rowData['_headers_map'] = array_combine($headers, $rawHeaders);
 
-                            try {
-                                $this->processRow($rowData);
-                                $successCount++;
-                            } catch (\Exception $e) {
-                                $failedCount++;
+                        try {
+                            $this->processRow($rowData);
+                            $successCount++;
+                        } catch (\Exception $e) {
+                            $failedCount++;
+                            $errorKey = "{$sheetName}:Row {$rowNumber}";
+                            $errors['rows'][$errorKey] = [
+                                'sheet' => $sheetName,
+                                'row_number' => $rowNumber,
+                                'errors' => $e->getMessage(),
+                                'data' => $rowData,
+                            ];
 
-                                // Only store first 100 errors to save memory
-                                if (count($errors['rows'] ?? []) < 100) {
-                                    $errors['rows']["{$sheetName}:Row {$rowNumber}"] = [
-                                        'sheet' => $sheetName,
-                                        'row_number' => $rowNumber,
-                                        'errors' => $e->getMessage(),
-                                        'data' => array_slice($rowData, 0, 5), // Only first 5 fields
-                                    ];
-                                }
+                            // Log detailed error information
+                            Log::error("Import row failed", [
+                                'import_id' => $this->import->id,
+                                'sheet' => $sheetName,
+                                'row_number' => $rowNumber,
+                                'error' => $e->getMessage(),
+                                'row_data' => $rowData,
+                                'trace' => $e->getTraceAsString(),
+                            ]);
 
-                                if (!$this->skipErrors) {
-                                    throw $e;
-                                }
+                            if (!$this->skipErrors) {
+                                throw $e;
                             }
-
-                            $processedRows++;
                         }
 
-                        DB::commit();
+                        $processedRows++;
 
-                        // Update progress every 5 chunks (2500 rows)
-                        if ($processedRows % 2500 < $chunkSize) {
+                        // Update progress every 10 rows
+                        if ($processedRows % 10 === 0) {
                             $this->import->update([
                                 'processed_rows' => $processedRows,
                                 'success_rows' => $successCount,
                                 'failed_rows' => $failedCount,
                             ]);
                         }
-
-                    } catch (\Exception $e) {
-                        DB::rollBack();
-                        if (!$this->skipErrors) {
-                            throw $e;
-                        }
                     }
+
+                    Log::info("Completed sheet {$sheetName}: {$successCount} success, {$failedCount} failed");
                 }
 
-                Log::info("Completed sheet {$sheetName}: {$successCount} success, {$failedCount} failed");
+                DB::commit();
+
+                // Final update with accurate counts
+                $this->import->update([
+                    'processed_rows' => $processedRows,
+                    'success_rows' => $successCount,
+                    'failed_rows' => $failedCount,
+                ]);
+
+                $this->import->update([
+                    'status' => 'completed',
+                    'completed_at' => now(),
+                    'errors' => $errors,
+                    'summary' => [
+                        'total' => $totalRows,
+                        'success' => $successCount,
+                        'failed' => $failedCount,
+                    ],
+                ]);
+
+                Log::info("ProcessImportJob completed for import ID: {$this->import->id}");
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
             }
-
-            // Free spreadsheet memory
-            $spreadsheet->disconnectWorksheets();
-            unset($spreadsheet);
-
-            // Final update
-            $this->import->update([
-                'status' => 'completed',
-                'completed_at' => now(),
-                'processed_rows' => $processedRows,
-                'success_rows' => $successCount,
-                'failed_rows' => $failedCount,
-                'errors' => $errors,
-                'summary' => [
-                    'total' => $totalRows,
-                    'success' => $successCount,
-                    'failed' => $failedCount,
-                ],
-            ]);
-
-            Log::info("ProcessImportJob completed for import ID: {$this->import->id}");
 
         } catch (\Exception $e) {
             Log::error("ProcessImportJob failed for import ID: {$this->import->id}: " . $e->getMessage());
@@ -335,63 +323,43 @@ class ProcessImportJob implements ShouldQueue
     private function findOrCreateGovernorate(?string $name): ?Governorate
     {
         if (empty($name)) return null;
-        $key = trim($name);
-        if (!isset($this->governorateCache[$key])) {
-            $this->governorateCache[$key] = Governorate::firstOrCreate(['name' => $key]);
-        }
-        return $this->governorateCache[$key];
+        return Governorate::firstOrCreate(['name' => trim($name)]);
     }
 
     private function findOrCreateCity(?string $name, ?Governorate $governorate): ?City
     {
         if (empty($name) || !$governorate) return null;
-        $key = $governorate->id . '_' . trim($name);
-        if (!isset($this->cityCache[$key])) {
-            $this->cityCache[$key] = City::firstOrCreate([
-                'governorate_id' => $governorate->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->cityCache[$key];
+        return City::firstOrCreate([
+            'governorate_id' => $governorate->id,
+            'name' => trim($name),
+        ]);
     }
 
     private function findOrCreateDistrict(?string $name, ?City $city): ?District
     {
         if (empty($name) || !$city) return null;
-        $key = $city->id . '_' . trim($name);
-        if (!isset($this->districtCache[$key])) {
-            $this->districtCache[$key] = District::firstOrCreate([
-                'city_id' => $city->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->districtCache[$key];
+        return District::firstOrCreate([
+            'city_id' => $city->id,
+            'name' => trim($name),
+        ]);
     }
 
     private function findOrCreateZone(?string $name, ?District $district): ?Zone
     {
         if (empty($name) || !$district) return null;
-        $key = $district->id . '_' . trim($name);
-        if (!isset($this->zoneCache[$key])) {
-            $this->zoneCache[$key] = Zone::firstOrCreate([
-                'district_id' => $district->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->zoneCache[$key];
+        return Zone::firstOrCreate([
+            'district_id' => $district->id,
+            'name' => trim($name),
+        ]);
     }
 
     private function findOrCreateArea(?string $name, ?Zone $zone): ?Area
     {
         if (empty($name) || !$zone) return null;
-        $key = $zone->id . '_' . trim($name);
-        if (!isset($this->areaCache[$key])) {
-            $this->areaCache[$key] = Area::firstOrCreate([
-                'zone_id' => $zone->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->areaCache[$key];
+        return Area::firstOrCreate([
+            'zone_id' => $zone->id,
+            'name' => trim($name),
+        ]);
     }
 
     /**
@@ -401,6 +369,8 @@ class ProcessImportJob implements ShouldQueue
      */
     private function processArchiveRow(array $row): void
     {
+        // Log raw row data for debugging
+        Log::debug("Processing archive row", ['row_data' => $row]);
 
         // Map keys - headers are now mapped by mapArabicHeaders()
         $fileNumber = $row['file_number'] ?? null;
@@ -439,6 +409,10 @@ class ProcessImportJob implements ShouldQueue
         // Handle merged cells: if owner_name is still empty, use last known owner name
         if (empty($ownerName) && !empty($this->lastKnownOwnerName)) {
             $ownerName = $this->lastKnownOwnerName;
+            Log::debug("Using last known owner name for merged cell", [
+                'row_number' => $this->currentRowNumber,
+                'owner_name' => $ownerName,
+            ]);
         }
 
         // If owner name is still empty, use default name
@@ -452,6 +426,10 @@ class ProcessImportJob implements ShouldQueue
         // Handle merged cells for file name and file number
         if (empty($fileNameCol) && !empty($this->lastKnownFileName)) {
             $fileNameCol = $this->lastKnownFileName;
+            Log::debug("Using last known file name for merged cell", [
+                'row_number' => $this->currentRowNumber,
+                'file_name' => $fileNameCol,
+            ]);
         }
 
         if (empty($fileNumber) && !empty($this->lastKnownFileNumber)) {
@@ -466,29 +444,34 @@ class ProcessImportJob implements ShouldQueue
             $this->lastKnownFileNumber = $fileNumber;
         }
 
-        // Find or create client with caching
-        $clientKey = trim($ownerName);
-        if (!isset($this->clientCache[$clientKey])) {
-            $this->clientCache[$clientKey] = Client::firstOrCreate(
-                ['name' => $clientKey],
-                ['name' => $clientKey, 'excel_row_number' => $this->currentRowNumber]
-            );
-        }
-        $client = $this->clientCache[$clientKey];
+        // Find or create client
+        $clientData = [
+            'name' => trim($ownerName),
+            'excel_row_number' => $this->currentRowNumber,
+        ];
 
-        // Update client files_code if file number provided (skip if already has it)
+        $client = Client::firstOrCreate(
+            ['name' => trim($ownerName)],
+            $clientData
+        );
+
+        // Update client files_code if file number provided
         if (!empty($fileNumber)) {
             $filesCodes = $client->files_code ?? [];
             if (!in_array($fileNumber, $filesCodes)) {
                 $filesCodes[] = $fileNumber;
                 $client->update(['files_code' => $filesCodes]);
-                $this->clientCache[$clientKey] = $client->fresh();
             }
         }
 
-        // Get governorate and city with caching
-        $governorate = $this->findOrCreateGovernorate($governorateName ?? 'القاهرة');
-        $city = $this->findOrCreateCity('القاهرة الجديدة', $governorate);
+        // Get governorate - use provided or default to القاهرة
+        $governorate = Governorate::firstOrCreate(['name' => trim($governorateName ?? 'القاهرة')]);
+
+        // Get default city (القاهرة الجديدة) - can be expanded later
+        $city = City::firstOrCreate([
+            'governorate_id' => $governorate->id,
+            'name' => 'القاهرة الجديدة',
+        ]);
 
         // Find or create geographic hierarchy
         $district = $this->findOrCreateDistrict($districtName, $city);
@@ -587,6 +570,17 @@ class ProcessImportJob implements ShouldQueue
             }
         }
 
+        Log::debug("Archive import row processed", [
+            'client' => $ownerName,
+            'lands_created' => count($lands),
+            'land_numbers' => array_map(fn($l) => $l->land_no, $lands),
+            'file_name' => $fileName,
+            'file_created' => !empty($lands),
+            'room' => $roomName,
+            'lane' => $laneName,
+            'stand' => $standName,
+            'rack' => $rackName,
+        ]);
     }
 
     /**
@@ -673,53 +667,37 @@ class ProcessImportJob implements ShouldQueue
     private function findOrCreateRoom(?string $name): ?Room
     {
         if (empty($name)) return null;
-        $key = trim($name);
-        if (!isset($this->roomCache[$key])) {
-            $this->roomCache[$key] = Room::firstOrCreate(
-                ['name' => $key],
-                ['name' => $key, 'building_name' => 'المبنى الرئيسي']
-            );
-        }
-        return $this->roomCache[$key];
+        return Room::firstOrCreate(
+            ['name' => trim($name)],
+            ['name' => trim($name), 'building_name' => 'المبنى الرئيسي']
+        );
     }
 
     private function findOrCreateLane(?string $name, ?Room $room): ?Lane
     {
         if (empty($name) || !$room) return null;
-        $key = $room->id . '_' . trim($name);
-        if (!isset($this->laneCache[$key])) {
-            $this->laneCache[$key] = Lane::firstOrCreate([
-                'room_id' => $room->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->laneCache[$key];
+        return Lane::firstOrCreate([
+            'room_id' => $room->id,
+            'name' => trim($name),
+        ]);
     }
 
     private function findOrCreateStand(?string $name, ?Lane $lane): ?Stand
     {
         if (empty($name) || !$lane) return null;
-        $key = $lane->id . '_' . trim($name);
-        if (!isset($this->standCache[$key])) {
-            $this->standCache[$key] = Stand::firstOrCreate([
-                'lane_id' => $lane->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->standCache[$key];
+        return Stand::firstOrCreate([
+            'lane_id' => $lane->id,
+            'name' => trim($name),
+        ]);
     }
 
     private function findOrCreateRack(?string $name, ?Stand $stand): ?Rack
     {
         if (empty($name) || !$stand) return null;
-        $key = $stand->id . '_' . trim($name);
-        if (!isset($this->rackCache[$key])) {
-            $this->rackCache[$key] = Rack::firstOrCreate([
-                'stand_id' => $stand->id,
-                'name' => trim($name),
-            ]);
-        }
-        return $this->rackCache[$key];
+        return Rack::firstOrCreate([
+            'stand_id' => $stand->id,
+            'name' => trim($name),
+        ]);
     }
 
     public function failed(\Throwable $exception): void
