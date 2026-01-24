@@ -5,8 +5,6 @@
                 <select name="search_field" class="form-select" >
                     <optgroup label="بيانات العميل">
                         <option value="name" {{ ($searchField ?? 'name') == 'name' ? 'selected' : '' }}>الاسم</option>
-                        <option value="mobile" {{ ($searchField ?? '') == 'mobile' ? 'selected' : '' }}>الموبايل</option>
-                        <option value="telephone" {{ ($searchField ?? '') == 'telephone' ? 'selected' : '' }}>التليفون</option>
                         <option value="national_id" {{ ($searchField ?? '') == 'national_id' ? 'selected' : '' }}>الرقم القومي</option>
                     </optgroup>
                     <optgroup label="بيانات الملفات">

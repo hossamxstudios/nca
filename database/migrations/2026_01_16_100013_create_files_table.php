@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('file_name');
             $table->string('original_name')->nullable();
             $table->integer('page_number')->nullable();
-            $table->integer('pages_count')->default(1);
+            $table->integer('pages_count')->default(0);
             $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending');
             $table->text('error_message')->nullable();
             $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();

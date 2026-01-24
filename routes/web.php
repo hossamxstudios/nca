@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\PageController;
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\BackupController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 
@@ -50,6 +51,7 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::get('/files/{file}/download-pages'                           , [FileController::class,                'downloadPages'])->name('files.download-pages');
     Route::get('/files/{file}/download-original'                        , [FileController::class,             'downloadOriginal'])->name('files.download-original');
     Route::put('/files/{file}/update-items'                             , [FileController::class,                  'updateItems'])->name('files.update-items');
+    Route::post('/files/{file}/combine'                                 , [FileController::class,                 'combineFiles'])->name('files.combine');
     Route::put('/files/{file}/update-location'                          , [FileController::class,               'updateLocation'])->name('files.update-location');
     Route::post('/clients/{client}/files'                               , [FileController::class,                        'store'])->name('files.store');
     // API for cascading dropdowns
@@ -145,6 +147,11 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
         Route::post('/activity-logs/bulk-delete'                        , [ActivityLogController::class,               'bulkDelete'])->name('activity-logs.bulk-delete');
         Route::post('/activity-logs/clear-old'                          , [ActivityLogController::class,                 'clearOld'])->name('activity-logs.clear-old');
         Route::delete('/activity-logs/{activityLog}'                    , [ActivityLogController::class,                  'destroy'])->name('activity-logs.destroy');
+    });
+    // Backup
+    Route::middleware('can:backup.access')->group(function () {
+        Route::get('/backup'                                            , [BackupController::class,                        'index'])->name('backup.index');
+        Route::get('/backup/download'                                   , [BackupController::class,                     'download'])->name('backup.download');
     });
 });
 

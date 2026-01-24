@@ -142,6 +142,16 @@
                 </li>
             @endcan
 
+            <!-- Backup -->
+            @can('backup.access')
+                <li class="side-nav-item">
+                    <a href="{{ route('admin.backup.index') }}" class="side-nav-link {{ request()->routeIs('admin.backup.*') ? 'active' : '' }}">
+                        <span class="menu-icon"><i class="ti ti-database-export"></i></span>
+                        <span class="menu-text">النسخ الاحتياطي</span>
+                    </a>
+                </li>
+            @endcan
+
         </ul>
     </div>
 </div>

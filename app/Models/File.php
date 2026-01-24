@@ -168,12 +168,13 @@ class File extends Model implements HasMedia
 
     /**
      * Generate a unique barcode for the file
-     * Format: NCA-YYYYMMDD-XXXXX (where XXXXX is a random 5-digit number)
+     * Format: Unix timestamp (13 digits with milliseconds)
      */
     public static function generateBarcode(): string
     {
         do {
-            $barcode = 'NCA-' . date('Ymd') . '-' . str_pad(random_int(0, 99999), 5, '0', STR_PAD_LEFT);
+            // Unix timestamp with milliseconds for uniqueness
+            $barcode = (string) round(microtime(true));
         } while (self::where('barcode', $barcode)->exists());
 
         return $barcode;

@@ -205,6 +205,108 @@ class FileController extends Controller {
     }
 
     /**
+     * Combine additional PDF files with the main file
+     */
+    public function combineFiles(Request $request, File $file)
+    {
+        $request->validate([
+            'additional_files' => 'required|array|min:1',
+            'additional_files.*' => 'file|mimes:pdf|max:102400',
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Get the main PDF
+            $mainMedia = $file->getFirstMedia('files');
+            if (!$mainMedia) {
+                return response()->json(['error' => 'الملف الأساسي غير موجود'], 404);
+            }
+
+            $mainPdfPath = $mainMedia->getPath();
+            $outputPath = storage_path('app/temp/combined_' . uniqid() . '.pdf');
+
+            // Ensure temp directory exists
+            if (!file_exists(dirname($outputPath))) {
+                mkdir(dirname($outputPath), 0755, true);
+            }
+
+            // Create new PDF with FPDI
+            $pdf = new Fpdi();
+
+            // Add pages from main PDF
+            $mainPageCount = $pdf->setSourceFile($mainPdfPath);
+            for ($i = 1; $i <= $mainPageCount; $i++) {
+                $tplId = $pdf->importPage($i);
+                $size = $pdf->getTemplateSize($tplId);
+                $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                $pdf->useTemplate($tplId);
+            }
+
+            $totalNewPages = $mainPageCount;
+
+            // Add pages from additional PDFs
+            foreach ($request->file('additional_files') as $additionalFile) {
+                $tempPath = $additionalFile->getRealPath();
+                $additionalPageCount = $pdf->setSourceFile($tempPath);
+
+                for ($i = 1; $i <= $additionalPageCount; $i++) {
+                    $tplId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($tplId);
+                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $pdf->useTemplate($tplId);
+                }
+
+                $totalNewPages += $additionalPageCount;
+            }
+
+            // Save combined PDF
+            $pdf->Output($outputPath, 'F');
+
+            // Replace old media with new combined PDF
+            $file->clearMediaCollection('files');
+            $file->addMedia($outputPath)
+                ->usingFileName('combined_' . $file->file_name . '.pdf')
+                ->toMediaCollection('files');
+
+            // Update pages count
+            $file->update(['pages_count' => $totalNewPages]);
+
+            // Log activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_UPDATE, ActivityLog::GROUP_FILES)
+                ->on($file)
+                ->description("دمج ملفات PDF - الإجمالي: {$totalNewPages} صفحة")
+                ->withNewValues([
+                    'original_pages' => $mainPageCount,
+                    'new_total_pages' => $totalNewPages,
+                    'files_combined' => count($request->file('additional_files')),
+                ])
+                ->log();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'تم دمج الملفات بنجاح',
+                'new_total_pages' => $totalNewPages,
+                'original_pages' => $mainPageCount,
+                'pdf_url' => $file->getFirstMediaUrl('files'),
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('PDF combine error: ' . $e->getMessage());
+
+            // Cleanup
+            if (isset($outputPath) && file_exists($outputPath)) {
+                unlink($outputPath);
+            }
+
+            return response()->json(['error' => 'حدث خطأ أثناء دمج الملفات: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Get PDF page count using PdfParser (pure PHP)
      */
     private function getPdfPageCount(string $pdfPath): int
@@ -237,6 +339,8 @@ class FileController extends Controller {
         $request->validate([
             'file_name' => 'required|string|max:255',
             'pdf_file' => 'required|file|mimes:pdf|max:102400',
+            'extra_pdf_files' => 'nullable|array',
+            'extra_pdf_files.*' => 'file|mimes:pdf|max:102400',
             'district_id' => 'required|exists:districts,id',
             'zone_id' => 'required|exists:zones,id',
             'area_id' => 'nullable|exists:areas,id',
@@ -275,12 +379,58 @@ class FileController extends Controller {
                 'status' => 'pending',
             ]);
 
-            // Upload PDF to media library
-            $media = $file->addMediaFromRequest('pdf_file')->toMediaCollection('files');
+            // Check if there are extra PDF files to combine
+            $hasExtraFiles = $request->hasFile('extra_pdf_files') && count($request->file('extra_pdf_files')) > 0;
 
-            // Get total pages from PDF
-            $pdfPath = $media->getPath();
-            $totalPages = $this->getPdfPageCount($pdfPath);
+            if ($hasExtraFiles) {
+                // Combine main file with extra files
+                $outputPath = storage_path('app/temp/combined_' . uniqid() . '.pdf');
+
+                // Ensure temp directory exists
+                if (!file_exists(dirname($outputPath))) {
+                    mkdir(dirname($outputPath), 0755, true);
+                }
+
+                $pdf = new Fpdi();
+
+                // Add pages from main PDF
+                $mainPdfPath = $request->file('pdf_file')->getRealPath();
+                $mainPageCount = $pdf->setSourceFile($mainPdfPath);
+                for ($i = 1; $i <= $mainPageCount; $i++) {
+                    $tplId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($tplId);
+                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $pdf->useTemplate($tplId);
+                }
+
+                $totalPages = $mainPageCount;
+
+                // Add pages from extra PDFs
+                foreach ($request->file('extra_pdf_files') as $extraFile) {
+                    $extraPath = $extraFile->getRealPath();
+                    $extraPageCount = $pdf->setSourceFile($extraPath);
+                    for ($i = 1; $i <= $extraPageCount; $i++) {
+                        $tplId = $pdf->importPage($i);
+                        $size = $pdf->getTemplateSize($tplId);
+                        $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                        $pdf->useTemplate($tplId);
+                    }
+                    $totalPages += $extraPageCount;
+                }
+
+                // Save combined PDF
+                $pdf->Output($outputPath, 'F');
+
+                // Upload combined PDF to media library
+                $file->addMedia($outputPath)
+                    ->usingFileName($request->file_name . '_combined.pdf')
+                    ->toMediaCollection('files');
+            } else {
+                // Upload single PDF to media library
+                $media = $file->addMediaFromRequest('pdf_file')->toMediaCollection('files');
+                $pdfPath = $media->getPath();
+                $totalPages = $this->getPdfPageCount($pdfPath);
+            }
 
             // Update file pages_count
             $file->update(['pages_count' => $totalPages, 'status' => 'completed']);

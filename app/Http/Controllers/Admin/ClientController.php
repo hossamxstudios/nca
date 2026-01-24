@@ -51,12 +51,6 @@ class ClientController extends Controller
                 case 'name':
                     $query->where('name', 'like', "%{$searchTerm}%");
                     break;
-                case 'mobile':
-                    $query->where('mobile', 'like', "%{$searchTerm}%");
-                    break;
-                case 'telephone':
-                    $query->where('telephone', 'like', "%{$searchTerm}%");
-                    break;
                 case 'national_id':
                     $query->where('national_id', 'like', "%{$searchTerm}%");
                     break;
@@ -137,7 +131,31 @@ class ClientController extends Controller
     {
         DB::beginTransaction();
         try {
-            $client = Client::create($request->validated());
+            // Extract file_name and land_no before creating client
+            $validated = $request->validated();
+            $fileName = $validated['file_name'] ?? null;
+            $landNo = $validated['land_no'] ?? null;
+            unset($validated['file_name'], $validated['land_no']);
+
+            $client = Client::create($validated);
+
+            // Create Land record if land_no is provided
+            $land = null;
+            if ($landNo) {
+                $land = $client->lands()->create([
+                    'land_no' => $landNo,
+                ]);
+            }
+
+            // Create File record if file_name is provided
+            if ($fileName) {
+                $client->files()->create([
+                    'file_name' => $fileName,
+                    'barcode' => File::generateBarcode(),
+                    'land_id' => $land?->id,
+                    'status' => 'pending',
+                ]);
+            }
 
             // Log create activity
             ActivityLogger::created($client, ActivityLog::GROUP_CLIENTS, $request->validated());
@@ -314,7 +332,7 @@ class ClientController extends Controller
         $clients = Client::with(['files' => function ($q) {
             $q->whereNull('parent_id')
               ->whereNotNull('barcode')
-              ->with(['land.district', 'land.zone', 'land.area']);
+              ->with(['land.district', 'land.zone', 'land.area', 'room', 'lane', 'stand', 'rack']);
         }])->whereIn('id', $request->client_ids)->get();
 
         $data = [];
@@ -322,9 +340,20 @@ class ClientController extends Controller
             foreach ($client->files as $file) {
                 if ($file->barcode) {
                     $geo = $file->land
-                        ? collect([$file->land->district?->name, $file->land->zone?->name, $file->land->area?->name, $file->land->land_no])
-                            ->filter()->implode(' - ')
+                        ? collect([
+                            $file->land->district?->name,
+                            $file->land->zone?->name,
+                            $file->land->area?->name,
+                            $file->land->land_no ? 'أرض ' . $file->land->land_no : null
+                        ])->filter()->implode(' - ')
                         : '-';
+
+                    $physical = collect([
+                        $file->room?->name ? 'غرفة ' . $file->room->name : null,
+                        $file->lane?->name ? 'ممر ' . $file->lane->name : null,
+                        $file->stand?->name ? 'ستاند ' . $file->stand->name : null,
+                        $file->rack?->name ? 'رف ' . $file->rack->name : null,
+                    ])->filter()->implode(' - ') ?: '-';
 
                     $data[] = [
                         'client_name' => $client->name,
@@ -332,6 +361,7 @@ class ClientController extends Controller
                         'file_name' => $file->file_name,
                         'pages_count' => $file->pages_count ?? 1,
                         'geo' => $geo,
+                        'physical' => $physical,
                     ];
                 }
             }
@@ -512,7 +542,7 @@ class ClientController extends Controller
             $sheet->setRightToLeft(true);
 
             // Headers matching import format
-            $headers = ['رقم', 'الملف', 'المالك', 'القطعه', 'الحي', 'المنطقة', 'المجاورة', 'الاوضة', 'الممر', 'الاستند', 'الرف'];
+            $headers = ['رقم', 'الملف', 'الباركود', 'المالك', 'القطعه', 'الحي', 'المنطقة', 'المجاورة', 'الاوضة', 'الممر', 'الاستند', 'الرف'];
 
             // Set headers
             foreach ($headers as $colIndex => $header) {
@@ -521,7 +551,7 @@ class ClientController extends Controller
             }
 
             // Style headers
-            $headerRange = 'A1:K1';
+            $headerRange = 'A1:L1';
             $sheet->getStyle($headerRange)->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
                 'fill' => [
@@ -556,15 +586,16 @@ class ClientController extends Controller
                     foreach ($client->files as $file) {
                         $sheet->setCellValue('A' . $rowNum, $fileNumber);
                         $sheet->setCellValue('B' . $rowNum, $file->file_name ?: 'لا يوجد');
-                        $sheet->setCellValue('C' . $rowNum, $clientName);
-                        $sheet->setCellValue('D' . $rowNum, $file->land?->land_no ?? '');
-                        $sheet->setCellValue('E' . $rowNum, $file->land?->district?->name ?? '');
-                        $sheet->setCellValue('F' . $rowNum, $file->land?->zone?->name ?? '');
-                        $sheet->setCellValue('G' . $rowNum, $file->land?->area?->name ?? '');
-                        $sheet->setCellValue('H' . $rowNum, $file->room?->name ?? '');
-                        $sheet->setCellValue('I' . $rowNum, $file->lane?->name ?? '');
-                        $sheet->setCellValue('J' . $rowNum, $file->stand?->name ?? '');
-                        $sheet->setCellValue('K' . $rowNum, $file->rack?->name ?? '');
+                        $sheet->setCellValue('C' . $rowNum, $file->barcode ?? '');
+                        $sheet->setCellValue('D' . $rowNum, $clientName);
+                        $sheet->setCellValue('E' . $rowNum, $file->land?->land_no ?? '');
+                        $sheet->setCellValue('F' . $rowNum, $file->land?->district?->name ?? '');
+                        $sheet->setCellValue('G' . $rowNum, $file->land?->zone?->name ?? '');
+                        $sheet->setCellValue('H' . $rowNum, $file->land?->area?->name ?? '');
+                        $sheet->setCellValue('I' . $rowNum, $file->room?->name ?? '');
+                        $sheet->setCellValue('J' . $rowNum, $file->lane?->name ?? '');
+                        $sheet->setCellValue('K' . $rowNum, $file->stand?->name ?? '');
+                        $sheet->setCellValue('L' . $rowNum, $file->rack?->name ?? '');
 
                         $rowNum++;
                         $fileNumber++;
@@ -573,8 +604,8 @@ class ClientController extends Controller
                     // Client has no files - still export with empty file info
                     $sheet->setCellValue('A' . $rowNum, $fileNumber);
                     $sheet->setCellValue('B' . $rowNum, 'لا يوجد');
-                    $sheet->setCellValue('C' . $rowNum, $clientName);
-                    $sheet->setCellValue('D' . $rowNum, '');
+                    $sheet->setCellValue('C' . $rowNum, '');
+                    $sheet->setCellValue('D' . $rowNum, $clientName);
                     $sheet->setCellValue('E' . $rowNum, '');
                     $sheet->setCellValue('F' . $rowNum, '');
                     $sheet->setCellValue('G' . $rowNum, '');
@@ -582,6 +613,7 @@ class ClientController extends Controller
                     $sheet->setCellValue('I' . $rowNum, '');
                     $sheet->setCellValue('J' . $rowNum, '');
                     $sheet->setCellValue('K' . $rowNum, '');
+                    $sheet->setCellValue('L' . $rowNum, '');
 
                     $rowNum++;
                     $fileNumber++;
@@ -590,7 +622,7 @@ class ClientController extends Controller
 
             // Style data rows
             if ($rowNum > 2) {
-                $dataRange = 'A2:K' . ($rowNum - 1);
+                $dataRange = 'A2:L' . ($rowNum - 1);
                 $sheet->getStyle($dataRange)->applyFromArray([
                     'alignment' => [
                         'horizontal' => Alignment::HORIZONTAL_CENTER,
@@ -603,7 +635,7 @@ class ClientController extends Controller
             }
 
             // Auto-size columns
-            foreach (range('A', 'K') as $col) {
+            foreach (range('A', 'L') as $col) {
                 $sheet->getColumnDimension($col)->setAutoSize(true);
             }
 

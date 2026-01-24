@@ -14,12 +14,45 @@
                     <span class="badge bg-primary ms-3">{{ $file->file_name }}</span>
                     <span class="badge bg-info ms-2" id="editTotalPagesInfo_{{ $file->id }}">{{ $file->pages_count ?? 0 }} صفحة</span>
                 </h5>
+                <div class="gap-2 d-flex align-items-center ms-auto me-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleCombineSection({{ $file->id }})">
+                        <i class="ti ti-file-plus me-1"></i>دمج ملفات
+                    </button>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
             <form action="{{ route('admin.files.update-items', $file->id) }}" method="POST" class="overflow-hidden edit-file-items-form d-flex flex-column flex-grow-1" data-file-id="{{ $file->id }}" data-total-pages="{{ $file->pages_count ?? 0 }}" data-pdf-url="{{ $pdfUrl }}">
                 @csrf
                 @method('PUT')
                 <div class="overflow-auto p-3 modal-body">
+                    {{-- Combine Files Section (Hidden by default) --}}
+                    <div id="combineSection_{{ $file->id }}" class="p-3 mb-3 rounded border bg-light" style="display: none;">
+                        <div class="mb-3 d-flex align-items-center justify-content-between">
+                            <h6 class="mb-0"><i class="ti ti-files me-2"></i>دمج ملفات PDF إضافية</h6>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleCombineSection({{ $file->id }})">
+                                <i class="ti ti-x"></i>
+                            </button>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-8">
+                                <input type="file" id="additionalFiles_{{ $file->id }}" class="form-control"
+                                       accept=".pdf" multiple>
+                                <small class="text-muted">اختر ملف PDF واحد أو أكثر لدمجها مع الملف الأساسي</small>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-primary w-100" onclick="combineFiles({{ $file->id }})">
+                                    <i class="ti ti-file-plus me-1"></i>دمج الملفات
+                                </button>
+                            </div>
+                        </div>
+                        <div id="combineProgress_{{ $file->id }}" class="mt-3" style="display: none;">
+                            <div class="progress">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                            </div>
+                            <small class="text-muted">جاري دمج الملفات...</small>
+                        </div>
+                    </div>
+
                     <div class="row">
                         {{-- Left Side - PDF Preview --}}
                         <div class="col-md-5">
@@ -169,6 +202,177 @@
 @endforeach
 
 <script>
+// Toggle combine section visibility
+function toggleCombineSection(fileId) {
+    const section = document.getElementById('combineSection_' + fileId);
+    section.style.display = section.style.display === 'none' ? 'block' : 'none';
+}
+
+// Combine files function
+function combineFiles(fileId) {
+    const fileInput = document.getElementById('additionalFiles_' + fileId);
+    const progressDiv = document.getElementById('combineProgress_' + fileId);
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert('الرجاء اختيار ملف PDF واحد على الأقل');
+        return;
+    }
+
+    const formData = new FormData();
+    for (let i = 0; i < fileInput.files.length; i++) {
+        formData.append('additional_files[]', fileInput.files[i]);
+    }
+
+    progressDiv.style.display = 'block';
+
+    fetch(`/files/${fileId}/combine`, {
+        method: 'POST',
+        headers: {
+            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        progressDiv.style.display = 'none';
+
+        if (data.success) {
+            // Update total pages badge
+            const badge = document.getElementById('editTotalPagesInfo_' + fileId);
+            badge.textContent = data.new_total_pages + ' صفحة';
+
+            // Update form data attribute
+            const form = document.querySelector(`.edit-file-items-form[data-file-id="${fileId}"]`);
+            form.dataset.totalPages = data.new_total_pages;
+            form.dataset.pdfUrl = data.pdf_url;
+
+            // Reinitialize page selects with new page count
+            initializeEditPageSelects(fileId, data.new_total_pages);
+
+            // Reload PDF preview
+            loadEditPdfPreview(fileId, data.pdf_url);
+
+            // Hide combine section and clear input
+            toggleCombineSection(fileId);
+            fileInput.value = '';
+
+            alert(`تم دمج الملفات بنجاح!\nالصفحات الأصلية: ${data.original_pages}\nالإجمالي الجديد: ${data.new_total_pages}`);
+        } else {
+            alert(data.error || 'حدث خطأ أثناء دمج الملفات');
+        }
+    })
+    .catch(error => {
+        progressDiv.style.display = 'none';
+        console.error('Error:', error);
+        alert('حدث خطأ أثناء دمج الملفات');
+    });
+}
+
+// Global functions for page selects
+function initializeEditPageSelects(fileId, totalPages) {
+    const modal = document.getElementById('editFileItemsModal_' + fileId);
+    const selects = modal.querySelectorAll('.edit-page-from-select, .edit-page-to-select');
+
+    selects.forEach(select => {
+        const initialValue = select.dataset.initialValue;
+        select.innerHTML = '<option value="">' + (select.classList.contains('edit-page-from-select') ? 'من' : 'إلى') + '</option>';
+
+        for (let i = 1; i <= totalPages; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = i;
+            select.appendChild(option);
+        }
+
+        if (initialValue) {
+            select.value = initialValue;
+        }
+    });
+}
+
+function loadEditPdfPreview(fileId, pdfUrl) {
+    pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
+        pdf.getPage(1).then(function(page) {
+            const canvas = document.getElementById('editPdfCanvas_' + fileId);
+            const context = canvas.getContext('2d');
+            const containerWidth = canvas.parentElement.offsetWidth - 40;
+            const viewport = page.getViewport({ scale: 1 });
+            const scale = containerWidth / viewport.width;
+            const scaledViewport = page.getViewport({ scale: scale });
+
+            canvas.height = scaledViewport.height;
+            canvas.width = scaledViewport.width;
+
+            page.render({
+                canvasContext: context,
+                viewport: scaledViewport
+            });
+        });
+    });
+}
+
+function getEditUsedRanges(fileId) {
+    const ranges = [];
+    const modal = document.getElementById('editFileItemsModal_' + fileId);
+    const toggles = modal.querySelectorAll('.edit-item-toggle:checked');
+
+    toggles.forEach(toggle => {
+        const itemId = toggle.dataset.itemId;
+        const fromSelect = document.getElementById('editPageFrom_' + fileId + '_' + itemId);
+        const toSelect = document.getElementById('editPageTo_' + fileId + '_' + itemId);
+
+        if (fromSelect.value && toSelect.value) {
+            ranges.push({
+                itemId: itemId,
+                from: parseInt(fromSelect.value),
+                to: parseInt(toSelect.value)
+            });
+        }
+    });
+    return ranges;
+}
+
+function updateEditAvailablePages(fileId) {
+    const modal = document.getElementById('editFileItemsModal_' + fileId);
+    const toggles = modal.querySelectorAll('.edit-item-toggle');
+    const completedRanges = getEditUsedRanges(fileId);
+
+    toggles.forEach(toggle => {
+        const itemId = toggle.dataset.itemId;
+        const fromSelect = document.getElementById('editPageFrom_' + fileId + '_' + itemId);
+        const toSelect = document.getElementById('editPageTo_' + fileId + '_' + itemId);
+
+        if (!toggle.checked) return;
+
+        const otherUsedPages = new Set();
+        completedRanges.forEach(range => {
+            if (range.itemId !== itemId) {
+                for (let i = range.from; i <= range.to; i++) {
+                    otherUsedPages.add(i);
+                }
+            }
+        });
+
+        const currentFromValue = parseInt(fromSelect.value) || 0;
+        const currentToValue = parseInt(toSelect.value) || 0;
+
+        Array.from(fromSelect.options).forEach(option => {
+            if (option.value) {
+                const pageNum = parseInt(option.value);
+                option.disabled = otherUsedPages.has(pageNum) && pageNum !== currentFromValue;
+            }
+        });
+
+        Array.from(toSelect.options).forEach(option => {
+            if (option.value) {
+                const pageNum = parseInt(option.value);
+                const usedByOthers = otherUsedPages.has(pageNum) && pageNum !== currentToValue;
+                option.disabled = usedByOthers || (currentFromValue && pageNum < currentFromValue);
+            }
+        });
+    });
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize edit modals
     document.querySelectorAll('.edit-file-items-form').forEach(form => {
@@ -237,109 +441,5 @@ document.addEventListener('DOMContentLoaded', function() {
             updateEditAvailablePages(fileId);
         });
     });
-
-    function initializeEditPageSelects(fileId, totalPages) {
-        const modal = document.getElementById('editFileItemsModal_' + fileId);
-        const selects = modal.querySelectorAll('.edit-page-from-select, .edit-page-to-select');
-
-        selects.forEach(select => {
-            const initialValue = select.dataset.initialValue;
-            select.innerHTML = '<option value="">' + (select.classList.contains('edit-page-from-select') ? 'من' : 'إلى') + '</option>';
-
-            for (let i = 1; i <= totalPages; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = i;
-                select.appendChild(option);
-            }
-
-            if (initialValue) {
-                select.value = initialValue;
-            }
-        });
-    }
-
-    function loadEditPdfPreview(fileId, pdfUrl) {
-        pdfjsLib.getDocument(pdfUrl).promise.then(function(pdf) {
-            pdf.getPage(1).then(function(page) {
-                const canvas = document.getElementById('editPdfCanvas_' + fileId);
-                const context = canvas.getContext('2d');
-                const containerWidth = canvas.parentElement.offsetWidth - 40;
-                const viewport = page.getViewport({ scale: 1 });
-                const scale = containerWidth / viewport.width;
-                const scaledViewport = page.getViewport({ scale: scale });
-
-                canvas.height = scaledViewport.height;
-                canvas.width = scaledViewport.width;
-
-                page.render({
-                    canvasContext: context,
-                    viewport: scaledViewport
-                });
-            });
-        });
-    }
-
-    function getEditUsedRanges(fileId) {
-        const ranges = [];
-        const modal = document.getElementById('editFileItemsModal_' + fileId);
-        const toggles = modal.querySelectorAll('.edit-item-toggle:checked');
-
-        toggles.forEach(toggle => {
-            const itemId = toggle.dataset.itemId;
-            const fromSelect = document.getElementById('editPageFrom_' + fileId + '_' + itemId);
-            const toSelect = document.getElementById('editPageTo_' + fileId + '_' + itemId);
-
-            if (fromSelect.value && toSelect.value) {
-                ranges.push({
-                    itemId: itemId,
-                    from: parseInt(fromSelect.value),
-                    to: parseInt(toSelect.value)
-                });
-            }
-        });
-        return ranges;
-    }
-
-    function updateEditAvailablePages(fileId) {
-        const modal = document.getElementById('editFileItemsModal_' + fileId);
-        const toggles = modal.querySelectorAll('.edit-item-toggle');
-        const completedRanges = getEditUsedRanges(fileId);
-
-        toggles.forEach(toggle => {
-            const itemId = toggle.dataset.itemId;
-            const fromSelect = document.getElementById('editPageFrom_' + fileId + '_' + itemId);
-            const toSelect = document.getElementById('editPageTo_' + fileId + '_' + itemId);
-
-            if (!toggle.checked) return;
-
-            const otherUsedPages = new Set();
-            completedRanges.forEach(range => {
-                if (range.itemId !== itemId) {
-                    for (let i = range.from; i <= range.to; i++) {
-                        otherUsedPages.add(i);
-                    }
-                }
-            });
-
-            const currentFromValue = parseInt(fromSelect.value) || 0;
-            const currentToValue = parseInt(toSelect.value) || 0;
-
-            Array.from(fromSelect.options).forEach(option => {
-                if (option.value) {
-                    const pageNum = parseInt(option.value);
-                    option.disabled = otherUsedPages.has(pageNum) && pageNum !== currentFromValue;
-                }
-            });
-
-            Array.from(toSelect.options).forEach(option => {
-                if (option.value) {
-                    const pageNum = parseInt(option.value);
-                    const usedByOthers = otherUsedPages.has(pageNum) && pageNum !== currentToValue;
-                    option.disabled = usedByOthers || (currentFromValue && pageNum < currentFromValue);
-                }
-            });
-        });
-    }
 });
 </script>

@@ -43,11 +43,18 @@
                                         </label>
                                         <input type="text" class="form-control" name="file_name" required placeholder="رقم الملف">
                                     </div>
-                                    <div class="col-md-8">
+                                    <div class="col-md-4">
                                         <label class="form-label fw-semibold">
-                                            <i class="ti ti-upload me-1"></i>اختر ملف PDF <span class="text-danger">*</span>
+                                            <i class="ti ti-upload me-1"></i>ملف PDF الأساسي <span class="text-danger">*</span>
                                         </label>
                                         <input type="file" class="form-control add-file-pdf-input" name="pdf_file" accept=".pdf" required data-client="{{ $client->id }}">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">
+                                            <i class="ti ti-file-plus me-1"></i>ملفات إضافية للدمج
+                                        </label>
+                                        <input type="file" class="form-control add-file-extra-pdfs" name="extra_pdf_files[]" accept=".pdf" multiple data-client="{{ $client->id }}" disabled>
+                                        <small class="text-muted">اختر الملف الأساسي أولاً</small>
                                     </div>
                                 </div>
                             </div>
@@ -333,21 +340,31 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // PDF file input change
+    // Store main file page counts
+    const addFileMainPages = {};
+
+    // PDF file input change (main file)
     document.querySelectorAll('.add-file-pdf-input').forEach(input => {
         input.addEventListener('change', function(e) {
             const clientId = this.dataset.client;
             const file = e.target.files[0];
+            const extraInput = document.querySelector(`.add-file-extra-pdfs[data-client="${clientId}"]`);
+
             if (file && file.type === 'application/pdf') {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     const typedArray = new Uint8Array(e.target.result);
                     pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
                         const totalPages = pdf.numPages;
+                        addFileMainPages[clientId] = totalPages;
                         document.querySelector(`.add-file-pages-info[data-client="${clientId}"]`).textContent = totalPages + ' صفحة';
                         document.querySelector(`#addFileModal_${clientId}`).dataset.totalPages = totalPages;
                         addFileUsedRanges[clientId] = [];
                         updateAddFilePageSelects(clientId, totalPages);
+
+                        // Enable extra files input
+                        extraInput.disabled = false;
+                        extraInput.previousElementSibling.nextElementSibling.textContent = 'اختر ملفات PDF إضافية للدمج';
 
                         pdf.getPage(1).then(function(page) {
                             const canvas = document.querySelector(`.add-file-canvas[data-client="${clientId}"]`);
@@ -365,6 +382,40 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 };
                 reader.readAsArrayBuffer(file);
+            } else {
+                // Disable extra files if main file removed
+                extraInput.disabled = true;
+                extraInput.value = '';
+                extraInput.previousElementSibling.nextElementSibling.textContent = 'اختر الملف الأساسي أولاً';
+            }
+        });
+    });
+
+    // Extra PDF files input change
+    document.querySelectorAll('.add-file-extra-pdfs').forEach(input => {
+        input.addEventListener('change', async function(e) {
+            const clientId = this.dataset.client;
+            const files = e.target.files;
+            const mainPages = addFileMainPages[clientId] || 0;
+
+            if (files.length > 0 && mainPages > 0) {
+                let extraPages = 0;
+
+                // Count pages from all extra files
+                for (const file of files) {
+                    if (file.type === 'application/pdf') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const typedArray = new Uint8Array(arrayBuffer);
+                        const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                        extraPages += pdf.numPages;
+                    }
+                }
+
+                const totalPages = mainPages + extraPages;
+                document.querySelector(`.add-file-pages-info[data-client="${clientId}"]`).textContent =
+                    `${totalPages} صفحة (${mainPages} أساسي + ${extraPages} إضافي)`;
+                document.querySelector(`#addFileModal_${clientId}`).dataset.totalPages = totalPages;
+                updateAddFilePageSelects(clientId, totalPages);
             }
         });
     });

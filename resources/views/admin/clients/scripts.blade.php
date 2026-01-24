@@ -103,7 +103,8 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.success && data.data.length > 0) {
-                printBulkBarcodes(data.data, data.total_stickers);
+                // Show print option modal
+                showBulkPrintOptionsModal(data.data, data.total_stickers);
             } else {
                 alert('لا توجد ملفات بها باركود للعملاء المحددين');
             }
@@ -114,8 +115,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     };
 
+    // Show bulk print options modal
+    function showBulkPrintOptionsModal(filesData, totalStickers) {
+        const filesCount = filesData.length;
+        const choice = confirm(
+            `اختر نوع الطباعة:\n\n` +
+            `اضغط "موافق" لطباعة كل الصفحات (${totalStickers} استيكر)\n` +
+            `اضغط "إلغاء" لطباعة أول صفحة فقط لكل ملف (${filesCount} استيكر)`
+        );
+
+        printBulkBarcodes(filesData, totalStickers, choice ? 'all' : 'first');
+    }
+
     // Print bulk barcodes
-    function printBulkBarcodes(filesData, totalStickers) {
+    function printBulkBarcodes(filesData, totalStickers, printOption = 'all') {
         const tempContainer = document.createElement('div');
         tempContainer.style.position = 'absolute';
         tempContainer.style.left = '-9999px';
@@ -137,22 +150,26 @@ document.addEventListener('DOMContentLoaded', function() {
 
         setTimeout(() => {
             let stickersHtml = '';
+            let actualTotalStickers = 0;
             filesData.forEach((file, index) => {
                 const svgElement = document.getElementById(`bulkBarcode_${index}`);
                 const barcodeSvg = svgElement ? svgElement.outerHTML : '';
-                const copies = file.pages_count || 1;
+                const copies = printOption === 'first' ? 1 : (file.pages_count || 1);
+                actualTotalStickers += copies;
 
                 for (let i = 0; i < copies; i++) {
                     stickersHtml += `
                         <div class="sticker">
                             <div class="client-name">${file.client_name}</div>
                             <div class="geo">${file.geo || '-'}</div>
+                            <div class="physical">${file.physical || '-'}</div>
                             <div class="barcode">${barcodeSvg}</div>
                             <div class="barcode-text">${file.barcode}</div>
                         </div>
                     `;
                 }
             });
+            totalStickers = actualTotalStickers;
 
             document.body.removeChild(tempContainer);
 
@@ -174,17 +191,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         .sticker:last-child { page-break-after: auto; }
                         .client-name {
-                            font-size: 6pt; font-weight: bold; text-align: center;
+                            font-size: 3pt; font-weight: bold; text-align: center;
                             max-width: 36mm; white-space: nowrap;
                             overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
                         }
                         .geo {
-                            font-size: 4pt; text-align: center; color: #333;
-                            max-width: 36mm; white-space: nowrap;
-                            overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
+                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            max-width: 36mm; text-overflow: ellipsis; line-height: 1.1; max-height: 7mm;
+                            border-bottom: .1mm solid black;
+                        }
+                        .physical {
+                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            max-width: 36mm; max-height: 7mm; line-height: 1;
                         }
                         .barcode { display: flex; justify-content: center; }
-                        .barcode svg { max-width: 34mm; height: 12mm; }
+                        .barcode svg { max-width: 33mm; height: 8mm; max-height: 12mm; }
                         .barcode-text { font-size: 5pt; font-family: monospace; text-align: center; line-height: 1.1; }
                     </style>
                 </head>

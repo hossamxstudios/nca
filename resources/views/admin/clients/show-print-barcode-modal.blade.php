@@ -6,7 +6,13 @@
             $file->land?->district?->name,
             $file->land?->zone?->name,
             $file->land?->area?->name,
-            $file->land?->land_no
+            $file->land?->land_no ? 'أرض ' . $file->land->land_no : null
+        ])->filter()->implode(' - ') ?: '-';
+        $physicalLocation = collect([
+            $file->room?->name ? 'غرفة ' . $file->room->name : null,
+            $file->lane?->name ? 'ممر ' . $file->lane->name : null,
+            $file->stand?->name ? 'ستاند ' . $file->stand->name : null,
+            $file->rack?->name ? 'رف ' . $file->rack->name : null,
         ])->filter()->implode(' - ') ?: '-';
     @endphp
     <div class="modal fade" id="printBarcodeModal_{{ $file->id }}" tabindex="-1" aria-hidden="true">
@@ -30,25 +36,43 @@
                         <div class="barcode-sticker-single">
                             <div class="sticker-client-name">{{ $client->name }}</div>
                             <div class="sticker-geo">{{ $geoLocation }}</div>
+                            <div class="sticker-physical">{{ $physicalLocation }}</div>
                             <svg class="barcode-svg" data-barcode="{{ $file->barcode }}"></svg>
                             <div class="sticker-barcode-text">{{ $file->barcode }}</div>
                             <div class="sticker-file-name">{{ $file->file_name }} ({{ $file->pages_count ?? 1 }} صفحة)</div>
                         </div>
                     </div>
-                    <div class="mt-4 text-center">
-                        <small class="text-muted">
-                            <i class="ti ti-info-circle me-1"></i>
-                            سيتم طباعة {{ $file->pages_count ?? 1 }} استيكر (نسخة لكل صفحة)
-                        </small>
+                    <div class="mt-4">
+                        <label class="mb-2 text-center form-label text-muted d-block">
+                            <i class="ti ti-settings me-1"></i>خيارات الطباعة
+                        </label>
+                        <div class="gap-3 d-flex justify-content-center">
+                            <div class="form-check">
+                                <input class="form-check-input print-option-show" type="radio"
+                                       name="printOptionShow_{{ $file->id }}" id="printAllShow_{{ $file->id }}" value="all" checked>
+                                <label class="form-check-label" for="printAllShow_{{ $file->id }}">
+                                    <strong>{{ $file->pages_count ?? 1 }}</strong> استيكر (كل الصفحات)
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input print-option-show" type="radio"
+                                       name="printOptionShow_{{ $file->id }}" id="printFirstShow_{{ $file->id }}" value="first">
+                                <label class="form-check-label" for="printFirstShow_{{ $file->id }}">
+                                    <strong>1</strong> استيكر (أول صفحة فقط)
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">
                         <i class="ti ti-x me-1"></i>إغلاق
                     </button>
                     <button type="button" class="btn btn-primary btn-print-single"
+                            data-file-id="{{ $file->id }}"
                             data-client="{{ $client->name }}"
                             data-geo="{{ $geoLocation }}"
+                            data-physical="{{ $physicalLocation }}"
                             data-barcode="{{ $file->barcode }}"
                             data-pages="{{ $file->pages_count ?? 1 }}">
                         <i class="ti ti-printer me-1"></i>طباعة
@@ -88,6 +112,16 @@
         font-size: 6px;
         text-align: center;
         color: #666;
+        line-height: 1.1;
+        width: 100%;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .barcode-sticker-single .sticker-physical {
+        font-size: 5px;
+        text-align: center;
+        color: #888;
         line-height: 1.1;
         width: 100%;
         white-space: nowrap;
@@ -138,19 +172,26 @@ document.addEventListener('DOMContentLoaded', function() {
     // Print single file
     document.querySelectorAll('.btn-print-single').forEach(btn => {
         btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
             const clientName = this.dataset.client;
             const geo = this.dataset.geo;
+            const physical = this.dataset.physical;
             const barcode = this.dataset.barcode;
             const pagesCount = parseInt(this.dataset.pages) || 1;
             const svgElement = this.closest('.modal').querySelector('.barcode-svg');
             const barcodeSvg = svgElement ? svgElement.outerHTML : '';
 
+            // Get selected print option
+            const printOption = this.closest('.modal').querySelector(`input[name="printOptionShow_${fileId}"]:checked`)?.value || 'all';
+            const actualCount = printOption === 'first' ? 1 : pagesCount;
+
             let stickersHtml = '';
-            for (let i = 0; i < pagesCount; i++) {
+            for (let i = 0; i < actualCount; i++) {
                 stickersHtml += `
                     <div class="sticker">
                         <div class="client-name">${clientName}</div>
                         <div class="geo">${geo}</div>
+                        <div class="physical">${physical}</div>
                         <div class="barcode">${barcodeSvg}</div>
                         <div class="barcode-text">${barcode}</div>
                     </div>
@@ -175,18 +216,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         .sticker:last-child { page-break-after: auto; }
                         .client-name {
-                            font-size: 6pt; font-weight: bold; text-align: center;
+                            font-size: 3pt; font-weight: bold; text-align: center;
                             max-width: 36mm; white-space: nowrap;
                             overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
                         }
                         .geo {
-                            font-size: 4pt; text-align: center; color: #333;
-                            max-width: 36mm; white-space: nowrap;
-                            overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
+                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            max-width: 36mm; text-overflow: ellipsis; line-height: 1.1; max-height: 7mm;
+                            border-bottom: .1mm solid black;
+                        }
+                        .physical {
+                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            max-width: 36mm; max-height: 7mm; line-height: 1;
                         }
                         .barcode { display: flex; justify-content: center; }
-                        .barcode svg { max-width: 34mm; height: 12mm; }
-                        .barcode-text { font-size: 5pt; font-family: monospace; text-align: center; line-height: 1.1; }
+                        .barcode svg { max-width: 33mm; height: 8mm; max-height: 12mm; }
+                        .barcode-text { font-size: 5pt; font-family: monospace; text-align: center; line-height: 1; margin-top: 1mm; }
                     </style>
                 </head>
                 <body>

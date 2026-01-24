@@ -106,6 +106,9 @@ class PermissionSeeder extends Seeder
                 'activity-logs.view' => 'عرض سجل النشاطات',
                 'activity-logs.delete' => 'حذف سجل النشاطات',
                 'activity-logs.export' => 'تصدير سجل النشاطات',
+
+                // Backup
+                'backup.access' => 'الوصول للنسخ الاحتياطي',
             ];
 
             // Create permissions
