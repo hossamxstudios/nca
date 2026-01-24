@@ -132,7 +132,6 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::get('/imports/{import}/progress'                             , [ImportController::class,                    'progress'])->name('imports.progress');
     Route::post('/imports/{import}/delete'                              , [ImportController::class,                     'destroy'])->name('imports.destroy');
     Route::get('/imports/download-template'                             , [ImportController::class,            'downloadTemplate'])->name('imports.download-template');
-    Route::get('/imports/queue-status'                                  , [ImportController::class,                 'queueStatus'])->name('imports.queue-status');
     // Profile
     Route::get('/profile'                                               , [ProfileController::class,                       'index'])->name('profile.index');
     Route::post('/profile'                                              , [ProfileController::class,                      'update'])->name('profile.update');

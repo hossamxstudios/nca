@@ -81,10 +81,10 @@ class ImportController extends Controller
 
             DB::commit();
 
-            // Update status to processing
-            $import->update(['status' => 'processing']);
+            // Update status to validating
+            $import->update(['status' => 'validating']);
 
-            // Dispatch job to queue (NSSM service handles the worker)
+            // Dispatch job to queue
             ProcessImportJob::dispatch(
                 $import,
                 $request->boolean('skip_errors', true),
@@ -442,18 +442,4 @@ class ImportController extends Controller
         };
     }
 
-    /**
-     * Check if queue worker is running (for status display)
-     */
-    public function queueStatus()
-    {
-        $pendingJobs = DB::table('jobs')->count();
-        $failedJobs = DB::table('failed_jobs')->count();
-
-        return response()->json([
-            'pending_jobs' => $pendingJobs,
-            'failed_jobs' => $failedJobs,
-            'queue_driver' => config('queue.default'),
-        ]);
-    }
 }
