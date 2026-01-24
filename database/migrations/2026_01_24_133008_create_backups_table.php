@@ -13,6 +13,13 @@ return new class extends Migration
     {
         Schema::create('backups', function (Blueprint $table) {
             $table->id();
+            $table->string('file_name');
+            $table->string('file_path');
+            $table->unsignedBigInteger('file_size')->default(0);
+            $table->enum('type', ['database', 'files', 'full'])->default('full');
+            $table->enum('status', ['pending', 'completed', 'failed'])->default('pending');
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }

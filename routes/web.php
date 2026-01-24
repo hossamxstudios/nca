@@ -42,8 +42,8 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::get('/clients/{client}/delete'                               , [ClientController::class,              'confirmDelete'])->name('clients.delete');
     Route::delete('/clients/{client}'                                   , [ClientController::class,                    'destroy'])->name('clients.destroy');
     Route::get('/clients/{client}/print-barcodes'                       , [ClientController::class,              'printBarcodes'])->name('clients.print-barcodes');
-    Route::post('/clients/log-print'                                     , [ClientController::class,                   'logPrint'])->name('clients.log-print');
-    Route::post('/clients/log-view'                                      , [ClientController::class,                    'logView'])->name('clients.log-view');
+    Route::post('/clients/log-print'                                    , [ClientController::class,                   'logPrint'])->name('clients.log-print');
+    Route::post('/clients/log-view'                                     , [ClientController::class,                    'logView'])->name('clients.log-view');
     Route::post('/clients/{id}/restore'                                 , [ClientController::class,                    'restore'])->name('clients.restore');
     Route::delete('/clients/{id}/force-delete'                          , [ClientController::class,                'forceDelete'])->name('clients.force-delete');
     // Files
@@ -150,8 +150,12 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
         Route::delete('/activity-logs/{activityLog}'                    , [ActivityLogController::class,                  'destroy'])->name('activity-logs.destroy');
     });
     // Backup
-    Route::get('/backup'                                                , [BackupController::class,                        'index'])->name('backup.index');
-    Route::get('/backup/download'                                       , [BackupController::class,                     'download'])->name('backup.download');
+    Route::middleware('can:backup.access')->group(function () {
+        Route::get('/backup'                                            , [BackupController::class,                        'index'])->name('backup.index');
+    });
+    Route::middleware('can:backup.create')->group(function () {
+        Route::get('/backup/download'                                   , [BackupController::class,                     'download'])->name('backup.download');
+    });
 });
 
 Route::get('/test-error/{code}', function ($code) {

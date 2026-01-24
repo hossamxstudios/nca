@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\Backup;
+use App\Services\ActivityLogger;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -28,12 +32,13 @@ class BackupController extends Controller
     ];
 
     /**
-     * Show backup settings form
+     * Show backup settings form with history
      */
     public function index()
     {
         $defaultPath = config('backup.path', storage_path('app/backups'));
-        return view('admin.backup.index', compact('defaultPath'));
+        $backups = Backup::with('creator')->latest()->paginate(10);
+        return view('admin.backup.index', compact('defaultPath', 'backups'));
     }
 
     /**
@@ -44,6 +49,16 @@ class BackupController extends Controller
         // Increase execution time for large backups
         set_time_limit(600); // 10 minutes
         ini_set('memory_limit', '512M');
+
+        // Create backup record
+        $backup = Backup::create([
+            'file_name' => 'backup_' . date('Y-m-d_H-i-s') . '.zip',
+            'file_path' => '',
+            'file_size' => 0,
+            'type' => 'full',
+            'status' => 'pending',
+            'created_by' => Auth::id(),
+        ]);
 
         try {
             $backupName = 'backup_' . date('Y-m-d_H-i-s');
@@ -75,7 +90,23 @@ class BackupController extends Controller
             // 4. Clean up the unzipped backup folder
             $this->deleteDirectory($backupPath);
 
-            // 5. Return download
+            // 5. Update backup record
+            $backup->update([
+                'file_name' => "{$backupName}.zip",
+                'file_path' => $zipPath,
+                'file_size' => file_exists($zipPath) ? filesize($zipPath) : 0,
+                'status' => 'completed',
+            ]);
+
+            // 6. Log activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_BACKUP, ActivityLog::GROUP_BACKUP)
+                ->on($backup)
+                ->description('تم إنشاء نسخة احتياطية: ' . $backup->file_name)
+                ->withProperties(['file_size' => $backup->file_size_formatted])
+                ->log();
+
+            // 7. Return download
             if ($request->input('download', true)) {
                 return response()->download($zipPath, "{$backupName}.zip");
             } else {
@@ -83,6 +114,12 @@ class BackupController extends Controller
             }
 
         } catch (\Exception $e) {
+            // Update backup record as failed
+            $backup->update([
+                'status' => 'failed',
+                'notes' => $e->getMessage(),
+            ]);
+
             Log::error('Backup failed: ' . $e->getMessage());
             return back()->with('error', 'فشل إنشاء النسخة الاحتياطية: ' . $e->getMessage());
         }

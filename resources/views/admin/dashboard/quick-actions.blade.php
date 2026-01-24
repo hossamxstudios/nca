@@ -46,18 +46,20 @@
                 </div>
             </a>
 
-            {{-- Backup System --}}
-            <a href="{{ route('admin.backup.index') }}" class="btn btn-outline-danger btn-lg d-flex align-items-center justify-content-start">
+            {{-- Backup System - Direct Download --}}
+            @can('backup.create')
+            <a href="{{ route('admin.backup.download') }}" class="btn btn-outline-danger btn-lg d-flex align-items-center justify-content-start" onclick="this.innerHTML='<div class=\'spinner-border spinner-border-sm text-danger me-2\'></div> جاري إنشاء النسخة...'">
                 <div class="avatar-sm me-3">
                     <div class="avatar-title bg-danger-subtle text-danger rounded">
                         <i class="ti ti-database-export fs-20"></i>
                     </div>
                 </div>
                 <div class="text-start">
-                    <h6 class="mb-0 fw-semibold">نسخة احتياطية</h6>
-                    <small class="text-muted">قاعدة البيانات + الملفات + الكود</small>
+                    <h6 class="mb-0 fw-semibold">تحميل نسخة احتياطية</h6>
+                    <small class="text-muted">تنزيل مباشر للنسخة الاحتياطية</small>
                 </div>
             </a>
+            @endcan
         </div>
     </div>
 </div>

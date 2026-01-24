@@ -359,7 +359,7 @@ class ClientController extends Controller
                         'client_name' => $client->name,
                         'barcode' => $file->barcode,
                         'file_name' => $file->file_name,
-                        'pages_count' => $file->pages_count ?? 1,
+                        'pages_count' => $file->pages_count ?: 1,
                         'geo' => $geo,
                         'physical' => $physical,
                     ];

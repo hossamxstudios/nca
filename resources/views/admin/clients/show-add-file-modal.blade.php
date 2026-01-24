@@ -1,4 +1,4 @@
-{{-- Add File Modal for Show Page (Single Client) --}}
+
 @php
     $rightColumnCount = 37;
     $rightColumnItems = $items->slice(0, $rightColumnCount);
@@ -37,17 +37,24 @@
                             {{-- File Info Section --}}
                             <div class="p-3 mb-3 rounded border bg-light">
                                 <div class="row g-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="form-label fw-semibold">
                                             <i class="ti ti-file me-1"></i>رقم الملف المستلم <span class="text-danger">*</span>
                                         </label>
                                         <input type="text" class="form-control" name="file_name" required placeholder="رقم الملف">
                                     </div>
-                                    <div class="col-md-8">
+                                    <div class="col-md-5">
                                         <label class="form-label fw-semibold">
-                                            <i class="ti ti-upload me-1"></i>اختر ملف PDF <span class="text-danger">*</span>
+                                            <i class="ti ti-file-type-pdf me-1 text-danger"></i>الملف الأساسي <span class="text-danger">*</span>
                                         </label>
                                         <input type="file" class="form-control" name="pdf_file" accept=".pdf" required id="showAddFilePdfInput">
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label fw-semibold">
+                                            <i class="ti ti-files me-1 text-info"></i>ملفات إضافية <span class="badge bg-secondary">اختياري</span>
+                                        </label>
+                                        <input type="file" class="form-control" name="extra_pdf_files[]" accept=".pdf" multiple id="showAddFileExtraInput" disabled>
+                                        <small class="text-muted" id="showAddFileExtraHint">اختر الملف الأساسي أولاً</small>
                                     </div>
                                 </div>
                             </div>
@@ -242,6 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!modal) return;
 
     let totalPages = 0;
+    let mainPages = 0;
     let usedRanges = [];
 
     // Load districts and rooms on modal show
@@ -254,18 +262,28 @@ document.addEventListener('DOMContentLoaded', function() {
         resetModal();
     });
 
-    // PDF file input change
+    // PDF file input change (main file)
     document.getElementById('showAddFilePdfInput')?.addEventListener('change', function(e) {
         const file = e.target.files[0];
+        const extraInput = document.getElementById('showAddFileExtraInput');
+        const extraHint = document.getElementById('showAddFileExtraHint');
+
         if (file && file.type === 'application/pdf') {
             const reader = new FileReader();
             reader.onload = function(e) {
                 const typedArray = new Uint8Array(e.target.result);
                 pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
-                    totalPages = pdf.numPages;
+                    mainPages = pdf.numPages;
+                    totalPages = mainPages;
                     document.getElementById('showAddFilePagesInfo').textContent = totalPages + ' صفحة';
                     usedRanges = [];
                     updatePageSelects(totalPages);
+
+                    // Enable extra files input
+                    if (extraInput) {
+                        extraInput.disabled = false;
+                        extraHint.textContent = 'اختر ملفات PDF إضافية للدمج';
+                    }
 
                     pdf.getPage(1).then(function(page) {
                         const canvas = document.getElementById('showAddFileCanvas');
@@ -283,6 +301,37 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             };
             reader.readAsArrayBuffer(file);
+        } else {
+            // Disable extra files if main file removed
+            if (extraInput) {
+                extraInput.disabled = true;
+                extraInput.value = '';
+                extraHint.textContent = 'اختر الملف الأساسي أولاً';
+            }
+        }
+    });
+
+    // Extra PDF files input change
+    document.getElementById('showAddFileExtraInput')?.addEventListener('change', async function(e) {
+        const files = e.target.files;
+
+        if (files.length > 0 && mainPages > 0) {
+            let extraPages = 0;
+
+            // Count pages from all extra files
+            for (const file of files) {
+                if (file.type === 'application/pdf') {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const typedArray = new Uint8Array(arrayBuffer);
+                    const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                    extraPages += pdf.numPages;
+                }
+            }
+
+            totalPages = mainPages + extraPages;
+            document.getElementById('showAddFilePagesInfo').textContent =
+                `${totalPages} صفحة (${mainPages} أساسي + ${extraPages} إضافي)`;
+            updatePageSelects(totalPages);
         }
     });
 
@@ -462,7 +511,18 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         document.querySelectorAll('#showAddFileLocationAccordion .accordion-collapse').forEach(collapse => collapse.classList.remove('show'));
         document.querySelectorAll('#showAddFileLocationAccordion .accordion-button').forEach(btn => btn.classList.add('collapsed'));
+        // Reset extra files input
+        const extraInput = document.getElementById('showAddFileExtraInput');
+        const extraHint = document.getElementById('showAddFileExtraHint');
+        if (extraInput) {
+            extraInput.disabled = true;
+            extraInput.value = '';
+        }
+        if (extraHint) {
+            extraHint.textContent = 'اختر الملف الأساسي أولاً';
+        }
         totalPages = 0;
+        mainPages = 0;
         usedRanges = [];
     }
 

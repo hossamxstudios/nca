@@ -32,6 +32,8 @@ class FileController extends Controller {
     {
         $request->validate([
             'pdf_file' => 'required|file|mimes:pdf|max:102400',
+            'extra_pdf_files' => 'nullable|array',
+            'extra_pdf_files.*' => 'file|mimes:pdf|max:102400',
             'items' => 'nullable|array',
             'items.*.enabled' => 'nullable',
             'items.*.from_page' => 'nullable|integer|min:1',
@@ -40,17 +42,63 @@ class FileController extends Controller {
 
         DB::beginTransaction();
         try {
-            // Upload PDF to media library
-            $media = $file->addMediaFromRequest('pdf_file')->toMediaCollection('files');
+            $hasExtraFiles = $request->hasFile('extra_pdf_files') && count($request->file('extra_pdf_files')) > 0;
+            $totalPages = 0;
 
-            // Get total pages from PDF
-            $pdfPath = $media->getPath();
-            $totalPages = $this->getPdfPageCount($pdfPath);
+            if ($hasExtraFiles) {
+                // Combine main file with extra files
+                $outputPath = storage_path('app/temp/combined_' . uniqid() . '.pdf');
+
+                // Ensure temp directory exists
+                if (!file_exists(dirname($outputPath))) {
+                    mkdir(dirname($outputPath), 0755, true);
+                }
+
+                $pdf = new Fpdi();
+
+                // Add pages from main PDF
+                $mainFile = $request->file('pdf_file');
+                $mainPageCount = $pdf->setSourceFile($mainFile->getRealPath());
+                for ($i = 1; $i <= $mainPageCount; $i++) {
+                    $templateId = $pdf->importPage($i);
+                    $size = $pdf->getTemplateSize($templateId);
+                    $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                    $pdf->useTemplate($templateId);
+                }
+                $totalPages += $mainPageCount;
+
+                // Add pages from extra PDFs
+                foreach ($request->file('extra_pdf_files') as $extraFile) {
+                    $extraPageCount = $pdf->setSourceFile($extraFile->getRealPath());
+                    for ($i = 1; $i <= $extraPageCount; $i++) {
+                        $templateId = $pdf->importPage($i);
+                        $size = $pdf->getTemplateSize($templateId);
+                        $pdf->AddPage($size['orientation'], [$size['width'], $size['height']]);
+                        $pdf->useTemplate($templateId);
+                    }
+                    $totalPages += $extraPageCount;
+                }
+
+                // Save combined PDF
+                $pdf->Output($outputPath, 'F');
+
+                // Upload combined PDF to media library
+                $file->addMedia($outputPath)
+                    ->usingFileName($file->file_name . '_combined.pdf')
+                    ->toMediaCollection('files');
+            } else {
+                // Upload single PDF to media library
+                $media = $file->addMediaFromRequest('pdf_file')->toMediaCollection('files');
+
+                // Get total pages from PDF
+                $pdfPath = $media->getPath();
+                $totalPages = $this->getPdfPageCount($pdfPath);
+            }
 
             // Update file pages_count
-            $file->update(['pages_count' => $totalPages]);
+            $file->update(['pages_count' => $totalPages, 'status' => 'completed']);
 
-            // Save item page ranges (no extraction - preview will use original PDF)
+            // Save item page ranges
             if ($request->has('items')) {
                 foreach ($request->items as $itemId => $itemData) {
                     if (isset($itemData['enabled']) && isset($itemData['from_page']) && isset($itemData['to_page'])) {
@@ -66,10 +114,21 @@ class FileController extends Controller {
 
             DB::commit();
 
-            return redirect()->back()->with('success', 'تم رفع الملف بنجاح');
+            $message = 'تم رفع الملف بنجاح';
+            if ($hasExtraFiles) {
+                $message .= ' (تم دمج ' . (count($request->file('extra_pdf_files')) + 1) . ' ملفات - ' . $totalPages . ' صفحة)';
+            }
+
+            return redirect()->back()->with('success', $message);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('File upload error: ' . $e->getMessage());
+
+            // Cleanup
+            if (isset($outputPath) && file_exists($outputPath)) {
+                unlink($outputPath);
+            }
+
             return redirect()->back()->with('error', 'حدث خطأ أثناء رفع الملف: ' . $e->getMessage());
         }
     }

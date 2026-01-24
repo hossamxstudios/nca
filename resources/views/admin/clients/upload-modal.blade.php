@@ -29,10 +29,21 @@
                         <div class="col-md-7">
                             {{-- File Input --}}
                             <div class="flex-shrink-0 mb-3">
-                                <label class="form-label fw-semibold">
-                                    <i class="ti ti-upload me-1"></i>اختر ملف PDF
-                                </label>
-                                <input type="file" class="form-control pdf-file-input" name="pdf_file" accept=".pdf" required data-file-id="{{ $file->id }}">
+                                <div class="row g-3">
+                                    <div class="col-md-7">
+                                        <label class="form-label fw-semibold">
+                                            <i class="ti ti-file-type-pdf me-1 text-danger"></i>الملف الأساسي <span class="text-danger">*</span>
+                                        </label>
+                                        <input type="file" class="form-control pdf-file-input" name="pdf_file" accept=".pdf" required data-file-id="{{ $file->id }}">
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label fw-semibold">
+                                            <i class="ti ti-files me-1 text-info"></i>ملفات إضافية <span class="badge bg-secondary">اختياري</span>
+                                        </label>
+                                        <input type="file" class="form-control extra-pdf-input" name="extra_pdf_files[]" accept=".pdf" multiple data-file-id="{{ $file->id }}" disabled>
+                                        <small class="text-muted">اختر الملف الأساسي أولاً</small>
+                                    </div>
+                                </div>
                             </div>
 
                             {{-- Items Table - 2 Columns --}}
@@ -163,12 +174,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Store used page ranges per file
     const usedRanges = {};
+    // Store main file page counts
+    const mainFilePages = {};
 
-    // Handle PDF file input change
+    // Handle PDF file input change (main file)
     document.querySelectorAll('.pdf-file-input').forEach(input => {
         input.addEventListener('change', function(e) {
             const fileId = this.dataset.fileId;
             const file = e.target.files[0];
+            const extraInput = document.querySelector(`.extra-pdf-input[data-file-id="${fileId}"]`);
 
             if (file && file.type === 'application/pdf') {
                 const reader = new FileReader();
@@ -177,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
                         const totalPages = pdf.numPages;
+                        mainFilePages[fileId] = totalPages;
 
                         // Update total pages display
                         document.getElementById('totalPagesInfo_' + fileId).textContent = totalPages + ' صفحة';
@@ -189,6 +204,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
                         // Update all page selects with page numbers
                         updatePageSelects(fileId, totalPages);
+
+                        // Enable extra files input
+                        if (extraInput) {
+                            extraInput.disabled = false;
+                        }
 
                         // Render first page preview
                         pdf.getPage(1).then(function(page) {
@@ -216,6 +236,41 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 };
                 reader.readAsArrayBuffer(file);
+            } else {
+                // Disable extra files if main file removed
+                if (extraInput) {
+                    extraInput.disabled = true;
+                    extraInput.value = '';
+                }
+            }
+        });
+    });
+
+    // Handle extra PDF files input change
+    document.querySelectorAll('.extra-pdf-input').forEach(input => {
+        input.addEventListener('change', async function(e) {
+            const fileId = this.dataset.fileId;
+            const files = e.target.files;
+            const mainPages = mainFilePages[fileId] || 0;
+
+            if (files.length > 0 && mainPages > 0) {
+                let extraPages = 0;
+
+                // Count pages from all extra files
+                for (const file of files) {
+                    if (file.type === 'application/pdf') {
+                        const arrayBuffer = await file.arrayBuffer();
+                        const typedArray = new Uint8Array(arrayBuffer);
+                        const pdf = await pdfjsLib.getDocument(typedArray).promise;
+                        extraPages += pdf.numPages;
+                    }
+                }
+
+                const totalPages = mainPages + extraPages;
+                document.getElementById('totalPagesInfo_' + fileId).textContent =
+                    `${totalPages} صفحة (${mainPages} أساسي + ${extraPages} إضافي)`;
+                document.querySelector(`#uploadFileModal_${fileId}`).dataset.totalPages = totalPages;
+                updatePageSelects(fileId, totalPages);
             }
         });
     });

@@ -147,9 +147,17 @@
                                             <span class="badge bg-primary fs-6">{{ $file->file_name }}</span>
                                         </div>
                                         @if($fileHasMedia)
-                                            <a href="{{ route('admin.files.download-original', $file->id) }}" class="btn btn-outline-primary btn-sm" title="تحميل الملف الأصلي">
-                                                <i class="ti ti-download me-1"></i>تحميل الملف
-                                            </a>
+                                            @php
+                                                $fullPdfUrl = $file->getFirstMediaUrl('files');
+                                            @endphp
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-outline-primary btn-preview-pdf" title="معاينة الملف كامل" data-pdf-url="{{ $fullPdfUrl }}" data-from-page="1" data-to-page="{{ $file->pages_count ?: 1 }}" data-title="معاينة: {{ $file->file_name }}" data-client-id="{{ $client->id }}" data-client-name="{{ $client->name }}" data-file-name="{{ $file->file_name }}" data-item-name="الملف الكامل">
+                                                    <i class="ti ti-eye me-1"></i>معاينة
+                                                </button>
+                                                <a href="{{ route('admin.files.download-original', $file->id) }}" class="btn btn-outline-primary" title="تحميل الملف الأصلي">
+                                                    <i class="ti ti-download me-1"></i>تحميل
+                                                </a>
+                                            </div>
                                         @endif
                                         @if($file->land)
                                         <div class="info-item">

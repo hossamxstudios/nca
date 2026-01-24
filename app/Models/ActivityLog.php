@@ -41,6 +41,7 @@ class ActivityLog extends Model
     const ACTION_EXPORT = 'export';
     const ACTION_DOWNLOAD = 'download';
     const ACTION_SEARCH = 'search';
+    const ACTION_BACKUP = 'backup';
 
     // Action Groups
     const GROUP_AUTH = 'auth';
@@ -52,6 +53,7 @@ class ActivityLog extends Model
     const GROUP_IMPORTS = 'imports';
     const GROUP_GEOGRAPHIC = 'geographic';
     const GROUP_PHYSICAL = 'physical';
+    const GROUP_BACKUP = 'backup';
 
     public function user(): BelongsTo
     {
@@ -114,6 +116,7 @@ class ActivityLog extends Model
             self::ACTION_EXPORT => 'تصدير',
             self::ACTION_DOWNLOAD => 'تحميل',
             self::ACTION_SEARCH => 'بحث',
+            self::ACTION_BACKUP => 'نسخ احتياطي',
             default => $this->action_type,
         };
     }
@@ -131,6 +134,7 @@ class ActivityLog extends Model
             self::GROUP_IMPORTS => 'الاستيراد',
             self::GROUP_GEOGRAPHIC => 'المواقع الجغرافية',
             self::GROUP_PHYSICAL => 'المواقع الفعلية',
+            self::GROUP_BACKUP => 'النسخ الاحتياطي',
             default => $this->action_group ?? '-',
         };
     }
@@ -150,6 +154,7 @@ class ActivityLog extends Model
             self::ACTION_EXPORT => 'teal',
             self::ACTION_DOWNLOAD => 'success',
             self::ACTION_SEARCH => 'dark',
+            self::ACTION_BACKUP => 'danger',
             default => 'secondary',
         };
     }
@@ -169,6 +174,7 @@ class ActivityLog extends Model
             self::ACTION_EXPORT => 'ti-file-export',
             self::ACTION_DOWNLOAD => 'ti-download',
             self::ACTION_SEARCH => 'ti-search',
+            self::ACTION_BACKUP => 'ti-database-export',
             default => 'ti-activity',
         };
     }
