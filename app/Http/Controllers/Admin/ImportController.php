@@ -81,13 +81,10 @@ class ImportController extends Controller
 
             DB::commit();
 
-            // Update status to validating
-            $import->update(['status' => 'validating']);
+            // Update status to processing
+            $import->update(['status' => 'processing']);
 
-            // Start queue worker in background BEFORE dispatching
-            $this->startQueueWorkerInBackground();
-
-            // Dispatch job to queue
+            // Dispatch job to queue (NSSM service handles the worker)
             ProcessImportJob::dispatch(
                 $import,
                 $request->boolean('skip_errors', true),
@@ -445,36 +442,18 @@ class ImportController extends Controller
         };
     }
 
-    private function startQueueWorkerInBackground(): void
+    /**
+     * Check if queue worker is running (for status display)
+     */
+    public function queueStatus()
     {
-        try {
-            // Check if we're using sync driver - jobs run immediately, no worker needed
-            if (config('queue.default') === 'sync') {
-                return;
-            }
+        $pendingJobs = DB::table('jobs')->count();
+        $failedJobs = DB::table('failed_jobs')->count();
 
-            $phpPath = PHP_BINARY;
-            $artisanPath = base_path('artisan');
-            $logPath = storage_path('logs/queue-worker.log');
-
-            if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-                // Windows
-                pclose(popen("start /B \"$phpPath\" \"$artisanPath\" queue:work --stop-when-empty --queue=default", 'r'));
-            } else {
-                // Unix/Mac - use shell_exec with proper backgrounding
-                $cmd = sprintf(
-                    '(%s %s queue:work --stop-when-empty --queue=default >> %s 2>&1) > /dev/null 2>&1 &',
-                    $phpPath,
-                    $artisanPath,
-                    $logPath
-                );
-                shell_exec($cmd);
-            }
-
-            Log::info('Queue worker started in background for import processing', ['command' => $cmd ?? 'windows']);
-
-        } catch (\Exception $e) {
-            Log::warning('Failed to start queue worker: ' . $e->getMessage());
-        }
+        return response()->json([
+            'pending_jobs' => $pendingJobs,
+            'failed_jobs' => $failedJobs,
+            'queue_driver' => config('queue.default'),
+        ]);
     }
 }

@@ -28,7 +28,7 @@ class ProcessImportJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $tries = 1;
-    public $timeout = 0; // No timeout limit
+    public $timeout = 3600;
 
     public $currentRowNumber = 0;
     public $currentSheetName = '';
@@ -44,10 +44,6 @@ class ProcessImportJob implements ShouldQueue
 
     public function handle(): void
     {
-        // Increase limits for large imports
-        set_time_limit(0);
-        ini_set('memory_limit', '6G');
-
         try {
             // Log::info("ProcessImportJob started for import ID: {$this->import->id}");
 
