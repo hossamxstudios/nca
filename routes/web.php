@@ -130,6 +130,7 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::post('/imports'                                              , [ImportController::class,                       'store'])->name('imports.store');
     Route::get('/imports/{import}/show'                                 , [ImportController::class,                        'show'])->name('imports.show');
     Route::get('/imports/{import}/progress'                             , [ImportController::class,                    'progress'])->name('imports.progress');
+    Route::get('/imports/{import}/json'                                 , [ImportController::class,                    'showJson'])->name('imports.show-json');
     Route::post('/imports/{import}/delete'                              , [ImportController::class,                     'destroy'])->name('imports.destroy');
     Route::get('/imports/download-template'                             , [ImportController::class,            'downloadTemplate'])->name('imports.download-template');
     // Profile
@@ -149,10 +150,8 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
         Route::delete('/activity-logs/{activityLog}'                    , [ActivityLogController::class,                  'destroy'])->name('activity-logs.destroy');
     });
     // Backup
-    Route::middleware('can:backup.access')->group(function () {
-        Route::get('/backup'                                            , [BackupController::class,                        'index'])->name('backup.index');
-        Route::get('/backup/download'                                   , [BackupController::class,                     'download'])->name('backup.download');
-    });
+    Route::get('/backup'                                                , [BackupController::class,                        'index'])->name('backup.index');
+    Route::get('/backup/download'                                       , [BackupController::class,                     'download'])->name('backup.download');
 });
 
 Route::get('/test-error/{code}', function ($code) {

@@ -430,7 +430,7 @@
 
             modal.show();
 
-            fetch(`{{ url('imports') }}/${importId}/show`)
+            fetch(`{{ url('imports') }}/${importId}/json`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {

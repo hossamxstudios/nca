@@ -3,10 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Backup;
-use App\Services\ActivityLogger;
-use App\Models\ActivityLog;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -18,42 +14,50 @@ use RecursiveDirectoryIterator;
 class BackupController extends Controller
 {
     /**
-     * Show backup history page
+     * Folders to exclude from project backup
+     */
+    private array $excludeFolders = [
+        'vendor',
+        'node_modules',
+        '.git',
+        'storage/app/backups',
+        'storage/logs',
+        'storage/framework/cache',
+        'storage/framework/sessions',
+        'storage/framework/views',
+    ];
+
+    /**
+     * Show backup settings form
      */
     public function index()
     {
-        $backups = Backup::with('user')->orderBy('created_at', 'desc')->paginate(20);
-        return view('admin.backup.index', compact('backups'));
+        $defaultPath = config('backup.path', storage_path('app/backups'));
+        return view('admin.backup.index', compact('defaultPath'));
     }
 
     /**
-     * Create and download a full backup (database + uploaded files)
+     * Create and save a full backup (database + uploaded files + project code)
      */
     public function download(Request $request)
     {
-        set_time_limit(600);
+        // Increase execution time for large backups
+        set_time_limit(600); // 10 minutes
         ini_set('memory_limit', '512M');
-
-        $backupRecord = null;
 
         try {
             $backupName = 'backup_' . date('Y-m-d_H-i-s');
-            $savePath = storage_path('app/backups');
 
+            // Get save path from request or config or default
+            $savePath = $request->input('save_path') ?: config('backup.path') ?: storage_path('app/backups');
+
+            // Ensure save path exists
             if (!file_exists($savePath)) {
                 mkdir($savePath, 0755, true);
             }
 
             $backupPath = "{$savePath}/{$backupName}";
             $zipPath = "{$savePath}/{$backupName}.zip";
-
-            // Create backup record
-            $backupRecord = Backup::create([
-                'user_id' => Auth::id(),
-                'filename' => "{$backupName}.zip",
-                'path' => $zipPath,
-                'status' => 'pending',
-            ]);
 
             if (!file_exists($backupPath)) {
                 mkdir($backupPath, 0755, true);
@@ -62,56 +66,26 @@ class BackupController extends Controller
             // 1. Export database
             $this->exportDatabase($backupPath);
 
-            // 2. Copy uploaded files
+            // 2. Copy uploaded files (storage/media)
             $this->copyUploadedFiles($backupPath);
 
             // 3. Create ZIP archive
             $this->createZipArchive($backupPath, $zipPath);
 
-            // 4. Clean up temp folder
+            // 4. Clean up the unzipped backup folder
             $this->deleteDirectory($backupPath);
 
-            // 5. Update backup record
-            $fileSize = file_exists($zipPath) ? filesize($zipPath) : 0;
-            $backupRecord->update([
-                'status' => 'completed',
-                'size' => $fileSize,
-            ]);
-
-            // 6. Log activity
-            ActivityLogger::make()
-                ->action(ActivityLog::ACTION_CREATE, ActivityLog::GROUP_SYSTEM)
-                ->description("إنشاء نسخة احتياطية: {$backupName}.zip (" . $this->formatBytes($fileSize) . ")")
-                ->log();
-
-            // 7. Return download
-            return response()->download($zipPath, "{$backupName}.zip")->deleteFileAfterSend(false);
+            // 5. Return download
+            if ($request->input('download', true)) {
+                return response()->download($zipPath, "{$backupName}.zip");
+            } else {
+                return back()->with('success', "تم حفظ النسخة الاحتياطية في: {$zipPath}");
+            }
 
         } catch (\Exception $e) {
             Log::error('Backup failed: ' . $e->getMessage());
-
-            if ($backupRecord) {
-                $backupRecord->update([
-                    'status' => 'failed',
-                    'notes' => $e->getMessage(),
-                ]);
-            }
-
-            ActivityLogger::make()
-                ->action(ActivityLog::ACTION_CREATE, ActivityLog::GROUP_SYSTEM)
-                ->description("فشل إنشاء نسخة احتياطية: " . $e->getMessage())
-                ->log();
-
-            return response()->json(['error' => 'فشل إنشاء النسخة الاحتياطية'], 500);
+            return back()->with('error', 'فشل إنشاء النسخة الاحتياطية: ' . $e->getMessage());
         }
-    }
-
-    private function formatBytes($bytes): string
-    {
-        if ($bytes >= 1073741824) return number_format($bytes / 1073741824, 2) . ' GB';
-        if ($bytes >= 1048576) return number_format($bytes / 1048576, 2) . ' MB';
-        if ($bytes >= 1024) return number_format($bytes / 1024, 2) . ' KB';
-        return $bytes . ' bytes';
     }
 
     /**

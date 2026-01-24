@@ -3,275 +3,217 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Import;
-use App\Models\Client;
-use App\Models\Land;
-use App\Models\File;
-use App\Models\Governorate;
-use App\Models\City;
-use App\Models\District;
-use App\Models\Zone;
-use App\Models\Area;
-use App\Models\Room;
-use App\Models\Lane;
-use App\Models\Stand;
-use App\Models\Rack;
 use App\Jobs\ProcessImportJob;
-use App\Models\ActivityLog;
+use App\Models\Import;
 use App\Services\ActivityLogger;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\View\View;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
+/**
+ * Controller for handling data imports.
+ *
+ * This controller is intentionally thin - all heavy processing logic
+ * is delegated to the ImportService and ProcessImportJob.
+ */
 class ImportController extends Controller
 {
-    public function index()
+    /**
+     * Display the imports index page.
+     */
+    public function index(): View
     {
         $imports = Import::with('user')
-            ->orderBy('id', 'desc')
-            ->paginate(20);
+            ->orderBy('created_at', 'desc')
+            ->paginate(15);
 
-        // Stats
-        $totalImports = Import::count();
-        $pendingImports = Import::pending()->count();
-        $processingImports = Import::processing()->count();
-        $completedImports = Import::completed()->count();
-        $failedImports = Import::failed()->count();
-
-        return view('admin.imports.index', compact(
-            'imports',
-            'totalImports',
-            'pendingImports',
-            'processingImports',
-            'completedImports',
-            'failedImports'
-        ));
+        return view('admin.imports.index', [
+            'imports' => $imports,
+            'totalImports' => Import::count(),
+            'pendingImports' => Import::where('status', 'pending')->count(),
+            'processingImports' => Import::whereIn('status', ['validating', 'processing'])->count(),
+            'completedImports' => Import::where('status', 'completed')->count(),
+            'failedImports' => Import::where('status', 'failed')->count(),
+        ]);
     }
 
-    public function store(Request $request)
+    /**
+     * Store a new import and dispatch the processing job.
+     */
+    public function store(Request $request): RedirectResponse
     {
         $request->validate([
             'file' => 'required|file|mimes:xlsx,xls,csv|max:51200', // 50MB max
-            'type' => 'required|in:full,clients,lands,geographic,archive',
-            'skip_errors' => 'nullable|boolean',
-            'update_existing' => 'nullable|boolean',
+            'type' => 'required|in:archive,full,clients,lands,geographic',
         ]);
 
         try {
-            DB::beginTransaction();
+            // Store the uploaded file
+            $file = $request->file('file');
+            $filename = time() . '_' . $file->getClientOriginalName();
+            $path = $file->storeAs('imports', $filename, 'local');
 
             // Create import record
             $import = Import::create([
                 'user_id' => Auth::id(),
-                'filename' => $request->file('file')->hashName(),
-                'original_filename' => $request->file('file')->getClientOriginalName(),
+                'filename' => $filename,
+                'original_filename' => $file->getClientOriginalName(),
                 'type' => $request->type,
                 'status' => 'pending',
-                'started_at' => now(),
+                'total_rows' => 0,
+                'processed_rows' => 0,
+                'success_rows' => 0,
+                'failed_rows' => 0,
+                'errors' => [],
             ]);
 
-            // Store file using Spatie Media Library
-            $import->addMediaFromRequest('file')
-                ->toMediaCollection('imports');
-
-            DB::commit();
-
-            // Update status to validating
-            $import->update(['status' => 'validating']);
-
-            // Dispatch job to queue
+            // Dispatch the job to the queue
             ProcessImportJob::dispatch(
                 $import,
+                $path,
+                $request->type,
                 $request->boolean('skip_errors', true),
-                $request->boolean('update_existing', false)
+                100 // chunk size
             );
 
-            // Log import activity
+            // Log activity
             ActivityLogger::make()
-                ->action(ActivityLog::ACTION_BULK_IMPORT, ActivityLog::GROUP_IMPORTS)
-                ->on($import, $request->file('file')->getClientOriginalName())
-                ->description("بدء استيراد ملف: {$request->file('file')->getClientOriginalName()}")
+                ->action('import_created', 'imports')
+                ->on($import)
                 ->withProperties([
+                    'filename' => $file->getClientOriginalName(),
                     'type' => $request->type,
-                    'filename' => $request->file('file')->getClientOriginalName(),
                 ])
                 ->log();
 
-            return redirect()->route('admin.imports.index')
-                ->with('success', 'تم رفع الملف بنجاح وجاري معالجته');
+            Log::info("[Import #{$import->id}] Import queued for processing", [
+                'file' => $filename,
+                'type' => $request->type,
+            ]);
 
-        } catch (\Exception $e) {
-            DB::rollBack();
+            return redirect()
+                ->route('admin.imports.index')
+                ->with('success', 'تم رفع الملف بنجاح وجاري معالجته في الخلفية');
+
+        } catch (\Throwable $e) {
             Log::error('Import upload failed: ' . $e->getMessage());
 
-            return redirect()->route('admin.imports.index')
-                ->with('error', 'فشل رفع الملف: ' . $e->getMessage());
+            return redirect()
+                ->route('admin.imports.index')
+                ->with('error', 'فشل في رفع الملف: ' . $e->getMessage());
         }
     }
 
-    public function show(Import $import)
+    /**
+     * Display import details.
+     */
+    public function show(Import $import): View
     {
         $import->load('user');
 
-        // Format errors for user-friendly display
-        $formattedErrors = $this->formatErrorsForDisplay($import->errors);
-
-        return view('admin.imports.show', compact('import', 'formattedErrors'));
+        return view('admin.imports.show', [
+            'import' => $import,
+        ]);
     }
 
     /**
-     * Format errors for user-friendly display
+     * Get import progress (for AJAX polling).
      */
-    private function formatErrorsForDisplay(?array $errors): array
-    {
-        if (empty($errors)) {
-            return [];
-        }
-
-        $formatted = [];
-
-        // Handle 'rows' structure
-        $rowErrors = $errors['rows'] ?? $errors;
-
-        foreach ($rowErrors as $key => $error) {
-            // Extract sheet name and row number from key like "ابو الهول:Row 35"
-            $sheetName = $error['sheet'] ?? 'غير محدد';
-            $rowNumber = $error['row_number'] ?? '?';
-            $data = $error['data'] ?? [];
-            $errorMessage = $error['errors'] ?? 'خطأ غير معروف';
-
-            // Parse technical error to user-friendly message
-            $friendlyError = $this->parseErrorMessage($errorMessage);
-
-            // Extract meaningful data
-            $formatted[] = [
-                'sheet' => $sheetName,
-                'row' => $rowNumber,
-                'client' => $data['owner_name'] ?? 'غير محدد',
-                'land' => $data['land_no'] ?? 'غير محدد',
-                'file_name' => $data['file_name_col'] ?? $data['file_name'] ?? 'غير محدد',
-                'district' => $data['district'] ?? '',
-                'zone' => $data['zone'] ?? '',
-                'area' => $data['area'] ?? '',
-                'location' => implode(' / ', array_filter([
-                    $data['room'] ?? null,
-                    $data['lane'] ?? null,
-                    $data['stand'] ?? null,
-                    $data['rack'] ?? null,
-                ])),
-                'error' => $friendlyError,
-                'error_type' => $this->getErrorType($errorMessage),
-            ];
-        }
-
-        return $formatted;
-    }
-
-    /**
-     * Parse technical error message to user-friendly Arabic message
-     */
-    private function parseErrorMessage(string $error): string
-    {
-        // Database constraint violations
-        if (str_contains($error, 'Column \'file_name\' cannot be null')) {
-            return 'اسم الملف مطلوب ولا يمكن أن يكون فارغاً';
-        }
-        if (str_contains($error, 'Column \'client_id\' cannot be null')) {
-            return 'العميل مطلوب';
-        }
-        if (str_contains($error, 'Column \'land_id\' cannot be null')) {
-            return 'رقم القطعة مطلوب';
-        }
-        if (str_contains($error, 'Duplicate entry')) {
-            return 'هذا السجل موجود مسبقاً (تكرار)';
-        }
-        if (str_contains($error, 'Integrity constraint violation')) {
-            return 'خطأ في البيانات - قيمة مطلوبة مفقودة';
-        }
-        if (str_contains($error, 'Data too long')) {
-            return 'النص طويل جداً';
-        }
-
-        // Validation errors
-        if (str_contains($error, 'required')) {
-            return 'حقل مطلوب مفقود';
-        }
-        if (str_contains($error, 'invalid')) {
-            return 'قيمة غير صالحة';
-        }
-
-        // Generic fallback - remove SQL details
-        if (str_contains($error, 'SQLSTATE')) {
-            return 'خطأ في حفظ البيانات';
-        }
-
-        return $error;
-    }
-
-    /**
-     * Get error type for styling
-     */
-    private function getErrorType(string $error): string
-    {
-        if (str_contains($error, 'Duplicate')) {
-            return 'warning';
-        }
-        if (str_contains($error, 'cannot be null') || str_contains($error, 'required')) {
-            return 'danger';
-        }
-        return 'danger';
-    }
-
-    public function progress(Import $import)
+    public function progress(Import $import): JsonResponse
     {
         return response()->json([
+            'id' => $import->id,
             'status' => $import->status,
             'status_badge' => $import->status_badge,
+            'progress_percentage' => $import->progress_percentage,
             'total_rows' => $import->total_rows,
             'processed_rows' => $import->processed_rows,
             'success_rows' => $import->success_rows,
             'failed_rows' => $import->failed_rows,
-            'progress_percentage' => $import->progress_percentage,
-            'completed_at' => $import->completed_at?->format('Y-m-d H:i:s'),
         ]);
     }
 
-    public function destroy(Import $import)
+    /**
+     * Get import details as JSON.
+     */
+    public function showJson(Import $import): JsonResponse
+    {
+        return response()->json([
+            'success' => true,
+            'import' => [
+                'id' => $import->id,
+                'original_filename' => $import->original_filename,
+                'type' => $import->type,
+                'type_label' => $import->type_label,
+                'status' => $import->status,
+                'status_badge' => $import->status_badge,
+                'progress_percentage' => $import->progress_percentage,
+                'total_rows' => $import->total_rows,
+                'processed_rows' => $import->processed_rows,
+                'success_rows' => $import->success_rows,
+                'failed_rows' => $import->failed_rows,
+                'errors' => $import->errors,
+                'summary' => $import->summary,
+                'user' => $import->user?->name,
+                'started_at' => $import->started_at?->format('Y-m-d H:i:s'),
+                'completed_at' => $import->completed_at?->format('Y-m-d H:i:s'),
+            ],
+        ]);
+    }
+
+    /**
+     * Delete an import record.
+     */
+    public function destroy(Import $import): RedirectResponse
     {
         try {
             // Only allow deletion of completed or failed imports
-            if (in_array($import->status, ['pending', 'validating', 'processing'])) {
-                return redirect()->route('admin.imports.index')
-                    ->with('error', 'لا يمكن حذف استيراد قيد المعالجة');
+            if (!in_array($import->status, ['completed', 'failed'])) {
+                return redirect()
+                    ->route('admin.imports.index')
+                    ->with('error', 'لا يمكن حذف الاستيراد أثناء المعالجة');
             }
 
-            // Log delete activity
+            // Delete the uploaded file
+            if ($import->filename) {
+                Storage::disk('local')->delete('imports/' . $import->filename);
+            }
+
+            // Log activity
             ActivityLogger::make()
-                ->action(ActivityLog::ACTION_DELETE, ActivityLog::GROUP_IMPORTS)
-                ->on($import, $import->original_filename)
-                ->description("حذف سجل استيراد: {$import->original_filename}")
+                ->action('import_deleted', 'imports')
+                ->on($import)
+                ->withProperties([
+                    'filename' => $import->original_filename,
+                ])
                 ->log();
 
             $import->delete();
 
-            return redirect()->route('admin.imports.index')
+            return redirect()
+                ->route('admin.imports.index')
                 ->with('success', 'تم حذف سجل الاستيراد بنجاح');
 
-        } catch (\Exception $e) {
-            return redirect()->route('admin.imports.index')
-                ->with('error', 'فشل حذف سجل الاستيراد');
+        } catch (\Throwable $e) {
+            Log::error('Import deletion failed: ' . $e->getMessage());
+
+            return redirect()
+                ->route('admin.imports.index')
+                ->with('error', 'فشل في حذف سجل الاستيراد');
         }
     }
 
-    public function downloadTemplate(Request $request)
+    /**
+     * Download an Excel template for the specified import type.
+     */
+    public function downloadTemplate(string $type)
     {
-        $type = $request->get('type', 'archive');
-
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setRightToLeft(true);
@@ -279,43 +221,41 @@ class ImportController extends Controller
         // Set headers based on type
         $headers = $this->getTemplateHeaders($type);
 
-        // Write headers
-        $colLetter = 'A';
-        foreach ($headers as $header) {
+        foreach ($headers as $col => $header) {
+            $colLetter = chr(65 + $col); // A, B, C, etc.
             $sheet->setCellValue($colLetter . '1', $header);
             $sheet->getColumnDimension($colLetter)->setAutoSize(true);
-            $colLetter++;
         }
 
-        // Style headers
-        $headerRange = 'A1:' . $sheet->getHighestColumn() . '1';
-        $sheet->getStyle($headerRange)->applyFromArray([
-            'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
+        // Style header row
+        $lastCol = chr(65 + count($headers) - 1);
+        $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
+            'font' => ['bold' => true],
             'fill' => [
                 'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
-                'startColor' => ['rgb' => '4472C4'],
+                'startColor' => ['rgb' => 'E2E8F0'],
             ],
-            'alignment' => ['horizontal' => \PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER],
         ]);
 
-        // Add sample data row
-        $sampleData = $this->getSampleData($type);
-        $colLetter = 'A';
-        foreach ($sampleData as $value) {
-            $sheet->setCellValue($colLetter . '2', $value);
-            $colLetter++;
+        // Add sample data for archive template
+        if ($type === 'archive') {
+            $sampleData = [
+                ['1', 'ملف-001', 'أحمد محمد', '123', 'الحي الأول', 'المنطقة أ', 'المجاورة 1', 'غرفة 1', 'ممر أ', 'ستاند 1', 'رف 1'],
+                ['2', 'ملف-002', 'محمد علي', '456', 'الحي الثاني', 'المنطقة ب', 'المجاورة 2', 'غرفة 2', 'ممر ب', 'ستاند 2', 'رف 2'],
+            ];
+
+            foreach ($sampleData as $rowIndex => $row) {
+                foreach ($row as $col => $value) {
+                    $colLetter = chr(65 + $col);
+                    $sheet->setCellValue($colLetter . ($rowIndex + 2), $value);
+                }
+            }
         }
 
-        // Create response
-        $filename = "import_template_{$type}_" . date('Y-m-d') . '.xlsx';
+        // Generate filename
+        $filename = "template_{$type}_" . date('Y-m-d') . '.xlsx';
 
-        // Log download template activity
-        ActivityLogger::make()
-            ->action(ActivityLog::ACTION_EXPORT, ActivityLog::GROUP_IMPORTS)
-            ->description("تحميل قالب استيراد: {$type}")
-            ->withProperties(['type' => $type, 'filename' => $filename])
-            ->log();
-
+        // Return as download
         $writer = new Xlsx($spreadsheet);
 
         header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -326,6 +266,9 @@ class ImportController extends Controller
         exit;
     }
 
+    /**
+     * Get template headers based on import type.
+     */
     private function getTemplateHeaders(string $type): array
     {
         return match ($type) {
@@ -334,7 +277,7 @@ class ImportController extends Controller
                 'الملف',
                 'المالك',
                 'القطعه',
-                'الحي',
+                'الحى',
                 'المنطقة',
                 'المجاورة',
                 'الاوضة',
@@ -343,18 +286,18 @@ class ImportController extends Controller
                 'الرف',
             ],
             'full' => [
-                'اسم العميل',
+                'رقم',
+                'الملف',
+                'المالك',
                 'الرقم القومي',
                 'الهاتف',
                 'الموبايل',
+                'القطعه',
                 'المحافظة',
                 'المدينة',
-                'الحي',
+                'الحى',
                 'المنطقة',
                 'المجاورة',
-                'رقم القطعة',
-                'رقم الوحدة',
-                'ملاحظات',
             ],
             'clients' => [
                 'اسم العميل',
@@ -365,13 +308,11 @@ class ImportController extends Controller
             ],
             'lands' => [
                 'اسم العميل',
-                'المحافظة',
-                'المدينة',
-                'الحي',
-                'المنطقة',
-                'المجاورة',
                 'رقم القطعة',
-                'رقم الوحدة',
+                'المحافظة',
+                'المدينة',
+                'الحي',
+                'العنوان',
             ],
             'geographic' => [
                 'المحافظة',
@@ -380,66 +321,8 @@ class ImportController extends Controller
                 'المنطقة',
                 'المجاورة',
             ],
-            default => [],
+            default => ['رقم', 'البيانات'],
         };
     }
-
-    private function getSampleData(string $type): array
-    {
-        return match ($type) {
-            'archive' => [
-                '1',
-                'ملف رقم 1',
-                'أحمد محمد',
-                'نموذج 5',
-                'الحي الأول',
-                'المنطقة أ',
-                'المجاورة 1',
-                'غرفة 1',
-                'ممر أ',
-                'ستاند 1',
-                'رف 1',
-            ],
-            'full' => [
-                'أحمد محمد',
-                '12345678901234',
-                '0223456789',
-                '01012345678',
-                'القاهرة',
-                'القاهرة الجديدة',
-                'الحي الأول',
-                'المنطقة أ',
-                'المجاورة 1',
-                '100',
-                '1',
-                'ملاحظات',
-            ],
-            'clients' => [
-                'أحمد محمد',
-                '12345678901234',
-                '0223456789',
-                '01012345678',
-                'ملاحظات',
-            ],
-            'lands' => [
-                'أحمد محمد',
-                'القاهرة',
-                'القاهرة الجديدة',
-                'الحي الأول',
-                'المنطقة أ',
-                'المجاورة 1',
-                '100',
-                '1',
-            ],
-            'geographic' => [
-                'القاهرة',
-                'القاهرة الجديدة',
-                'الحي الأول',
-                'المنطقة أ',
-                'المجاورة 1',
-            ],
-            default => [],
-        };
-    }
-
 }
+

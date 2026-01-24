@@ -52,7 +52,6 @@ class ActivityLog extends Model
     const GROUP_IMPORTS = 'imports';
     const GROUP_GEOGRAPHIC = 'geographic';
     const GROUP_PHYSICAL = 'physical';
-    const GROUP_SYSTEM = 'system';
 
     public function user(): BelongsTo
     {
