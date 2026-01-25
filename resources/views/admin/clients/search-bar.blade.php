@@ -10,8 +10,8 @@
                     <optgroup label="بيانات الملفات">
                         <option value="file_name" {{ ($searchField ?? '') == 'file_name' ? 'selected' : '' }}>رقم الملف</option>
                     </optgroup>
-                    <optgroup label="بيانات الأراضي">
-                        <option value="land_no" {{ ($searchField ?? '') == 'land_no' ? 'selected' : '' }}>رقم الأرض</option>
+                    <optgroup label="بيانات القطع">
+                        <option value="land_no" {{ ($searchField ?? '') == 'land_no' ? 'selected' : '' }}>رقم القطعة</option>
                     </optgroup>
                 </select>
             </div>
