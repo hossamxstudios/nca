@@ -216,22 +216,22 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         .sticker:last-child { page-break-after: auto; }
                         .client-name {
-                            font-size: 4pt; font-weight: bold; text-align: center;
+                            font-size: 5.5pt; font-weight: bold; text-align: center;
                             max-width: 36mm; white-space: nowrap;
                             overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
                         }
                         .geo {
-                            font-size: 4pt; text-align: center; color: black; font-weight: bold;
+                            font-size: 5.5pt; text-align: center; color: black; font-weight: bold;
                             max-width: 36mm; text-overflow: ellipsis; line-height: 1.1; max-height: 7mm;
                             border-bottom: .1mm solid black;
                         }
                         .physical {
-                            font-size: 4pt; text-align: center; color: black; font-weight: bold;
+                            font-size: 5.5pt; text-align: center; color: black; font-weight: bold;
                             max-width: 36mm; max-height: 7mm; line-height: 1;
                         }
                         .barcode { display: flex; justify-content: center; }
                         .barcode svg { max-width: 33mm; height: 8mm; max-height: 12mm; }
-                        .barcode-text { font-size: 5pt; font-family: monospace; text-align: center; line-height: 1; margin-top: 1mm; }
+                        .barcode-text { font-size: 5.5pt; font-family: monospace; text-align: center; line-height: 1; margin-top: 1mm; }
                     </style>
                 </head>
                 <body>
