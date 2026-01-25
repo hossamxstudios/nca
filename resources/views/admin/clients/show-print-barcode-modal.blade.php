@@ -216,17 +216,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         .sticker:last-child { page-break-after: auto; }
                         .client-name {
-                            font-size: 3pt; font-weight: bold; text-align: center;
+                            font-size: 4pt; font-weight: bold; text-align: center;
                             max-width: 36mm; white-space: nowrap;
                             overflow: hidden; text-overflow: ellipsis; line-height: 1.1;
                         }
                         .geo {
-                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            font-size: 4pt; text-align: center; color: black; font-weight: bold;
                             max-width: 36mm; text-overflow: ellipsis; line-height: 1.1; max-height: 7mm;
                             border-bottom: .1mm solid black;
                         }
                         .physical {
-                            font-size: 3pt; text-align: center; color: black; font-weight: bold;
+                            font-size: 4pt; text-align: center; color: black; font-weight: bold;
                             max-width: 36mm; max-height: 7mm; line-height: 1;
                         }
                         .barcode { display: flex; justify-content: center; }
