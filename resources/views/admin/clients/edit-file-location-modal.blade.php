@@ -22,7 +22,7 @@
                                     <span class="fw-bold">العنوان الجغرافي (الأرض)</span>
                                 </button>
                             </h2>
-                            <div id="editGeoCollapse_{{ $file->id }}" class="accordion-collapse collapse show" data-bs-parent="#editLocationAccordion_{{ $file->id }}">
+                            <div id="editGeoCollapse_{{ $file->id }}" class="accordion-collapse collapse show">
                                 <div class="py-3 accordion-body">
                                     <div class="row g-3">
                                         <div class="col-md-6">
@@ -55,13 +55,13 @@
                         {{-- Physical Location Section --}}
                         <div class="accordion-item">
                             <h2 class="accordion-header">
-                                <button class="py-2 accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#editPhysicalCollapse_{{ $file->id }}">
+                                <button class="py-2 accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#editPhysicalCollapse_{{ $file->id }}">
                                     <i class="ti ti-building me-2 text-info"></i>
                                     <span class="fw-bold">الموقع الفعلي</span>
                                     <span class="badge bg-secondary ms-2">اختياري</span>
                                 </button>
                             </h2>
-                            <div id="editPhysicalCollapse_{{ $file->id }}" class="accordion-collapse collapse" data-bs-parent="#editLocationAccordion_{{ $file->id }}">
+                            <div id="editPhysicalCollapse_{{ $file->id }}" class="accordion-collapse collapse show">
                                 <div class="py-3 accordion-body">
                                     <div class="row g-3">
                                         <div class="col-md-6">

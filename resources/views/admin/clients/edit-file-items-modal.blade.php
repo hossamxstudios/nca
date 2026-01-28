@@ -8,7 +8,7 @@
 <div class="modal fade" id="editFileItemsModal_{{ $file->id }}" tabindex="-1" aria-labelledby="editFileItemsModalLabel_{{ $file->id }}" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen modal-dialog-centered scroll-y">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="pt-2 pb-1 modal-header">
                 <h5 class="modal-title" id="editFileItemsModalLabel_{{ $file->id }}">
                     <i class="ti ti-edit me-2"></i>تعديل الملفات الفرعية
                     <span class="badge bg-primary ms-3">{{ $file->file_name }}</span>
@@ -56,8 +56,23 @@
                     <div class="row">
                         {{-- Left Side - PDF Preview --}}
                         <div class="col-md-5">
-                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center justify-content-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 50px);">
-                                <canvas id="editPdfCanvas_{{ $file->id }}" class="w-100" style=""></canvas>
+                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 50px); overflow: hidden;">
+                                {{-- Rotation Controls --}}
+                                <div class="mb-2 btn-group btn-group-sm" style="position: relative; z-index: 10;">
+                                    <button type="button" class="btn btn-outline-secondary btn-rotate-left" data-file-id="{{ $file->id }}" title="تدوير لليسار">
+                                        <i class="ti ti-rotate-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-rotate-right" data-file-id="{{ $file->id }}" title="تدوير لليمين">
+                                        <i class="ti ti-rotate-clockwise-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-rotate-reset" data-file-id="{{ $file->id }}" title="إعادة تعيين">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="rotation" id="editRotation_{{ $file->id }}" value="0">
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="overflow: auto;">
+                                    <canvas id="editPdfCanvas_{{ $file->id }}" style="transition: transform 0.3s ease; max-width: 100%;"></canvas>
+                                </div>
                             </div>
                         </div>
 
@@ -186,7 +201,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="pt-0 pb-0 modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="ti ti-x me-1"></i>إلغاء
                     </button>
@@ -439,6 +454,62 @@ document.addEventListener('DOMContentLoaded', function() {
         select.addEventListener('change', function() {
             const fileId = this.dataset.fileId;
             updateEditAvailablePages(fileId);
+        });
+    });
+
+    // Rotation functionality
+    const rotationState = {};
+
+    document.querySelectorAll('.btn-rotate-left').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            rotationState[fileId] = (rotationState[fileId] || 0) - 90;
+            applyEditRotation(fileId);
+        });
+    });
+
+    document.querySelectorAll('.btn-rotate-right').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            rotationState[fileId] = (rotationState[fileId] || 0) + 90;
+            applyEditRotation(fileId);
+        });
+    });
+
+    document.querySelectorAll('.btn-rotate-reset').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            rotationState[fileId] = 0;
+            applyEditRotation(fileId);
+        });
+    });
+
+    function applyEditRotation(fileId) {
+        const canvas = document.getElementById('editPdfCanvas_' + fileId);
+        const rotationInput = document.getElementById('editRotation_' + fileId);
+        const rotation = rotationState[fileId] || 0;
+
+        canvas.style.transform = `rotate(${rotation}deg)`;
+        rotationInput.value = rotation;
+
+        // Adjust container for 90/270 rotations
+        const container = canvas.parentElement;
+        if (Math.abs(rotation % 180) === 90) {
+            container.style.overflow = 'visible';
+        } else {
+            container.style.overflow = 'hidden';
+        }
+    }
+
+    // Reset rotation when modal closes
+    document.querySelectorAll('[id^="editFileItemsModal_"]').forEach(modal => {
+        modal.addEventListener('hidden.bs.modal', function() {
+            const fileId = this.id.replace('editFileItemsModal_', '');
+            rotationState[fileId] = 0;
+            const canvas = document.getElementById('editPdfCanvas_' + fileId);
+            const rotationInput = document.getElementById('editRotation_' + fileId);
+            if (canvas) canvas.style.transform = '';
+            if (rotationInput) rotationInput.value = '0';
         });
     });
 });

@@ -6,7 +6,7 @@
             <form action="{{ route('admin.clients.update', $client->id) }}" method="POST">
                 @csrf
                 @method('PUT')
-                <div class="modal-header">
+                <div class="pt-2 pb-1 modal-header">
                     <h5 class="modal-title">
                         <i class="ti ti-user-edit me-2"></i>تعديل بيانات العميل
                     </h5>

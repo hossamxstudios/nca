@@ -53,6 +53,8 @@ Route::middleware(['auth'])->name('admin.')->group(function () {
     Route::put('/files/{file}/update-items'                             , [FileController::class,                  'updateItems'])->name('files.update-items');
     Route::post('/files/{file}/combine'                                 , [FileController::class,                 'combineFiles'])->name('files.combine');
     Route::put('/files/{file}/update-location'                          , [FileController::class,               'updateLocation'])->name('files.update-location');
+    Route::delete('/files/{file}/clear-media'                           , [FileController::class,                   'clearMedia'])->name('files.clear-media');
+    Route::put('/files/{file}/update-name'                              , [FileController::class,                   'updateName'])->name('files.update-name');
     Route::post('/clients/{client}/files'                               , [FileController::class,                        'store'])->name('files.store');
     // API for cascading dropdowns
     Route::get('/api/districts'                                         , [FileController::class,                 'getDistricts'])->name('api.districts');

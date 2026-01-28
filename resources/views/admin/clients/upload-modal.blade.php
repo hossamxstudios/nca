@@ -2,7 +2,7 @@
 <div class="modal fade" id="uploadFileModal_{{ $file->id }}" tabindex="-1" aria-labelledby="uploadFileModalLabel_{{ $file->id }}" aria-hidden="true">
     <div class="modal-dialog modal-fullscreen modal-dialog-centered scroll-y">
         <div class="modal-content">
-            <div class="modal-header">
+            <div class="pt-2 pb-1 modal-header">
                 <h5 class="modal-title" id="uploadFileModalLabel_{{ $file->id }}">
                     <i class="ti ti-upload me-2"></i>رفع ملف
                     <span class="badge bg-primary ms-3">{{ $file->file_name }}</span>
@@ -16,12 +16,27 @@
                     <div class="row">
                         {{-- Left Side - PDF Preview --}}
                         <div class="col-md-5">
-                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center justify-content-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 50px);">
+                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 50px); overflow: hidden;">
+                                {{-- Rotation Controls --}}
+                                <div class="mb-2 btn-group btn-group-sm d-none upload-rotation-controls" data-file-id="{{ $file->id }}" style="position: relative; z-index: 10;">
+                                    <button type="button" class="btn btn-outline-secondary upload-rotate-left" data-file-id="{{ $file->id }}" title="تدوير لليسار">
+                                        <i class="ti ti-rotate-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary upload-rotate-right" data-file-id="{{ $file->id }}" title="تدوير لليمين">
+                                        <i class="ti ti-rotate-clockwise-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary upload-rotate-reset" data-file-id="{{ $file->id }}" title="إعادة تعيين">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="rotation" class="upload-rotation-input" data-file-id="{{ $file->id }}" value="0">
                                 <div id="pdfPreview_{{ $file->id }}" class="text-center pdf-preview w-100">
                                     <i class="ti ti-file-type-pdf text-muted" style="font-size: 5rem;"></i>
                                     <p class="mt-3 text-muted">معاينة الصفحة الأولى ستظهر هنا</p>
                                 </div>
-                                <canvas id="pdfCanvas_{{ $file->id }}" class="d-none w-100" style=""></canvas>
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="overflow: auto;">
+                                    <canvas id="pdfCanvas_{{ $file->id }}" class="d-none" style="transition: transform 0.3s ease; max-width: 100%;"></canvas>
+                                </div>
                             </div>
                         </div>
 
@@ -137,7 +152,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="pt-0 pb-0 modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="ti ti-x me-1"></i>إلغاء
                     </button>
@@ -232,6 +247,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             // Show canvas, hide placeholder
                             canvas.classList.remove('d-none');
                             document.getElementById('pdfPreview_' + fileId).classList.add('d-none');
+                            document.querySelector(`.upload-rotation-controls[data-file-id="${fileId}"]`).classList.remove('d-none');
                         });
                     });
                 };
@@ -445,6 +461,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('pdfCanvas_' + fileId).classList.add('d-none');
             document.getElementById('totalPagesInfo_' + fileId).textContent = '0 صفحة';
 
+            // Reset rotation
+            uploadRotationState[fileId] = 0;
+            const rotationControls = document.querySelector(`.upload-rotation-controls[data-file-id="${fileId}"]`);
+            const rotationInput = document.querySelector(`.upload-rotation-input[data-file-id="${fileId}"]`);
+            const canvas = document.getElementById('pdfCanvas_' + fileId);
+            if (rotationControls) rotationControls.classList.add('d-none');
+            if (rotationInput) rotationInput.value = '0';
+            if (canvas) canvas.style.transform = '';
+
             // Reset all selects
             this.querySelectorAll('.page-from-select, .page-to-select').forEach(select => {
                 select.innerHTML = '<option value="">' + (select.classList.contains('page-from-select') ? 'من' : 'إلى') + '</option>';
@@ -460,5 +485,41 @@ document.addEventListener('DOMContentLoaded', function() {
             usedRanges[fileId] = [];
         });
     });
+
+    // Rotation functionality
+    const uploadRotationState = {};
+
+    document.querySelectorAll('.upload-rotate-left').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            uploadRotationState[fileId] = (uploadRotationState[fileId] || 0) - 90;
+            applyUploadRotation(fileId);
+        });
+    });
+
+    document.querySelectorAll('.upload-rotate-right').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            uploadRotationState[fileId] = (uploadRotationState[fileId] || 0) + 90;
+            applyUploadRotation(fileId);
+        });
+    });
+
+    document.querySelectorAll('.upload-rotate-reset').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const fileId = this.dataset.fileId;
+            uploadRotationState[fileId] = 0;
+            applyUploadRotation(fileId);
+        });
+    });
+
+    function applyUploadRotation(fileId) {
+        const canvas = document.getElementById('pdfCanvas_' + fileId);
+        const rotationInput = document.querySelector(`.upload-rotation-input[data-file-id="${fileId}"]`);
+        const rotation = uploadRotationState[fileId] || 0;
+
+        canvas.style.transform = `rotate(${rotation}deg)`;
+        rotationInput.value = rotation;
+    }
 });
 </script>

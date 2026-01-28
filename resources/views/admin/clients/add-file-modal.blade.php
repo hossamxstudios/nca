@@ -9,7 +9,7 @@
 <div class="modal fade" id="addFileModal_{{ $client->id }}" tabindex="-1">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
-            <div class="modal-header bg-primary-subtle">
+            <div class="pt-2 pb-1 modal-header bg-primary-subtle">
                 <h5 class="modal-title">
                     <i class="ti ti-file-plus me-2"></i>إضافة ملف جديد
                     <span class="badge bg-primary ms-2">{{ $client->name }}</span>
@@ -23,12 +23,27 @@
                     <div class="row">
                         {{-- Left Side - PDF Preview --}}
                         <div class="col-md-4">
-                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center justify-content-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 180px);">
+                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 180px); overflow: hidden;">
+                                {{-- Rotation Controls --}}
+                                <div class="mb-2 btn-group btn-group-sm d-none add-file-rotation-controls" data-client="{{ $client->id }}" style="position: relative; z-index: 10;">
+                                    <button type="button" class="btn btn-outline-secondary add-file-rotate-left" data-client="{{ $client->id }}" title="تدوير لليسار">
+                                        <i class="ti ti-rotate-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary add-file-rotate-right" data-client="{{ $client->id }}" title="تدوير لليمين">
+                                        <i class="ti ti-rotate-clockwise-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary add-file-rotate-reset" data-client="{{ $client->id }}" title="إعادة تعيين">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="rotation" class="add-file-rotation" data-client="{{ $client->id }}" value="0">
                                 <div class="text-center add-file-pdf-placeholder w-100" data-client="{{ $client->id }}">
                                     <i class="ti ti-file-type-pdf text-muted" style="font-size: 5rem;"></i>
                                     <p class="mt-3 text-muted">معاينة الصفحة الأولى ستظهر هنا</p>
                                 </div>
-                                <canvas class="d-none w-100 add-file-canvas" data-client="{{ $client->id }}"></canvas>
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="overflow: auto;">
+                                    <canvas class="d-none add-file-canvas" data-client="{{ $client->id }}" style="transition: transform 0.3s ease; max-width: 100%;"></canvas>
+                                </div>
                             </div>
                         </div>
 
@@ -217,7 +232,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="pt-0 pb-0 modal-footer">
                     <button type="button" class="btn bg-danger-subtle" data-bs-dismiss="modal">
                         <i class="ti ti-x me-1"></i>إلغاء
                     </button>
@@ -378,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             page.render({ canvasContext: context, viewport: scaledViewport });
                             canvas.classList.remove('d-none');
                             document.querySelector(`.add-file-pdf-placeholder[data-client="${clientId}"]`).classList.add('d-none');
+                            document.querySelector(`.add-file-rotation-controls[data-client="${clientId}"]`).classList.remove('d-none');
                         });
                     });
                 };
@@ -678,5 +694,55 @@ document.addEventListener('DOMContentLoaded', function() {
             select.disabled = false;
         });
     }
+
+    // Rotation functionality
+    const addFileRotationState = {};
+
+    document.querySelectorAll('.add-file-rotate-left').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const clientId = this.dataset.client;
+            addFileRotationState[clientId] = (addFileRotationState[clientId] || 0) - 90;
+            applyAddFileRotation(clientId);
+        });
+    });
+
+    document.querySelectorAll('.add-file-rotate-right').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const clientId = this.dataset.client;
+            addFileRotationState[clientId] = (addFileRotationState[clientId] || 0) + 90;
+            applyAddFileRotation(clientId);
+        });
+    });
+
+    document.querySelectorAll('.add-file-rotate-reset').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const clientId = this.dataset.client;
+            addFileRotationState[clientId] = 0;
+            applyAddFileRotation(clientId);
+        });
+    });
+
+    function applyAddFileRotation(clientId) {
+        const canvas = document.querySelector(`.add-file-canvas[data-client="${clientId}"]`);
+        const rotationInput = document.querySelector(`.add-file-rotation[data-client="${clientId}"]`);
+        const rotation = addFileRotationState[clientId] || 0;
+
+        canvas.style.transform = `rotate(${rotation}deg)`;
+        rotationInput.value = rotation;
+    }
+
+    // Reset rotation when modal closes
+    document.querySelectorAll('[id^="addFileModal_"]').forEach(modal => {
+        modal.addEventListener('hidden.bs.modal', function() {
+            const clientId = this.id.replace('addFileModal_', '');
+            addFileRotationState[clientId] = 0;
+            const canvas = document.querySelector(`.add-file-canvas[data-client="${clientId}"]`);
+            const rotationInput = document.querySelector(`.add-file-rotation[data-client="${clientId}"]`);
+            const rotationControls = document.querySelector(`.add-file-rotation-controls[data-client="${clientId}"]`);
+            if (canvas) canvas.style.transform = '';
+            if (rotationInput) rotationInput.value = '0';
+            if (rotationControls) rotationControls.classList.add('d-none');
+        });
+    });
 });
 </script>

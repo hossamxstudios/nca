@@ -55,20 +55,20 @@
                         <td rowspan="{{ $filesCount > 0 ? $filesCount : 1 }}">
                             <div class="fw-semibold">{{ $client->name }}</div>
                             @if($client->excel_row_number)
-                                <small class="text-muted">صف: {{ $client->excel_row_number }}</small>
+                                <span class="text-dark fs-5 fw-bold">صف: {{ $client->excel_row_number }}</span>
                             @endif
                         </td>
                         @if($firstFile)
                         <td>
-                            <span class="badge bg-secondary-subtle text-secondary">{{ $firstFile->file_name }}</span>
+                            <span class="text-white badge bg-dark fs-5">{{ $firstFile->file_name }}</span>
                         </td>
                         <td>
                             @if($firstFile->land)
                             <div class="flex-wrap gap-1 d-flex">
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">الحي:</span> {{ $firstFile->land?->district?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المجاورة:</span> {{ $firstFile->land?->zone?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المنطقة:</span> {{ $firstFile->land?->area?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">القطعة:</span> {{ $firstFile->land?->land_no ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">الحي:</span> {{ $firstFile->land?->district?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">المجاورة:</span> {{ $firstFile->land?->zone?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">المنطقة:</span> {{ $firstFile->land?->area?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">القطعة:</span> {{ $firstFile->land?->land_no ?? '-' }}</span>
                             </div>
                             @else
                             <span class="text-muted">-</span>
@@ -77,10 +77,10 @@
                         <td>
                             @if($firstFile->room || $firstFile->lane || $firstFile->stand || $firstFile->rack)
                             <div class="flex-wrap gap-1 d-flex">
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">غرفة:</span> {{ $firstFile->room?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">ممر:</span> {{ $firstFile->lane?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">استاند:</span> {{ $firstFile->stand?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">رف:</span> {{ $firstFile->rack?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">غرفة:</span> {{ $firstFile->room?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">ممر:</span> {{ $firstFile->lane?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">استاند:</span> {{ $firstFile->stand?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">رف:</span> {{ $firstFile->rack?->name }}</span>
                             </div>
                             @else
                             <span class="text-muted">-</span>
@@ -130,15 +130,15 @@
                     @foreach($client->files->skip(1) as $file)
                     <tr class="file-subrow">
                         <td>
-                            <span class="badge bg-secondary-subtle text-secondary fs-6">{{ $file->file_name }}</span>
+                            <span class="text-white badge bg-dark fs-5">{{ $file->file_name }}</span>
                         </td>
                         <td>
                             @if($file->land)
                             <div class="flex-wrap gap-1 d-flex">
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">الحي:</span> {{ $file->land?->district?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المجاورة:</span> {{ $file->land?->zone?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">المنطقة:</span> {{ $file->land?->area?->name ?? '-' }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">القطعة:</span> {{ $file->land?->land_no ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">الحي:</span> {{ $file->land?->district?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">المجاورة:</span> {{ $file->land?->zone?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">المنطقة:</span> {{ $file->land?->area?->name ?? '-' }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">القطعة:</span> {{ $file->land?->land_no ?? '-' }}</span>
                             </div>
                             @else
                                 <span class="text-muted">-</span>
@@ -147,10 +147,10 @@
                         <td>
                             @if($file->room || $file->lane || $file->stand || $file->rack)
                             <div class="flex-wrap gap-1 d-flex">
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">غرفة:</span> {{ $file->room?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">ممر:</span> {{ $file->lane?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">استاند:</span> {{ $file->stand?->name }}</span>
-                                <span class="border badge bg-light text-dark fs-6"><span class="text-dark">رف:</span> {{ $file->rack?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">غرفة:</span> {{ $file->room?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">ممر:</span> {{ $file->lane?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">استاند:</span> {{ $file->stand?->name }}</span>
+                                <span class="border badge bg-light text-dark fs-5"><span class="text-dark">رف:</span> {{ $file->rack?->name }}</span>
                             </div>
                             @else
                             <span class="text-muted">-</span>

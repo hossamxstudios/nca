@@ -674,6 +674,66 @@ class FileController extends Controller {
     }
 
     /**
+     * Clear uploaded media and items from a file (keep location data)
+     */
+    public function clearMedia(File $file)
+    {
+        DB::beginTransaction();
+        try {
+            // Delete all file items (page ranges)
+            FileItem::where('file_id', $file->id)->delete();
+
+            // Clear media collection
+            $file->clearMediaCollection('files');
+
+            // Reset file status and pages count
+            $file->update([
+                'pages_count' => 0,
+                'status' => 'pending',
+            ]);
+
+            // Log activity
+            ActivityLogger::make()
+                ->action(ActivityLog::ACTION_DELETE, ActivityLog::GROUP_CLIENTS)
+                ->on($file)
+                ->description("مسح الملف المرفوع: {$file->file_name}")
+                ->withProperties(['file_name' => $file->file_name])
+                ->log();
+
+            DB::commit();
+
+            return redirect()->back()->with('success', 'تم مسح الملف المرفوع بنجاح. يمكنك إعادة رفع ملف جديد.');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            Log::error('Clear media error: ' . $e->getMessage());
+            return redirect()->back()->with('error', 'حدث خطأ أثناء مسح الملف: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Update file name
+     */
+    public function updateName(Request $request, File $file)
+    {
+        $request->validate([
+            'file_name' => 'required|string|max:255',
+        ]);
+
+        $oldName = $file->file_name;
+        $file->update(['file_name' => $request->file_name]);
+
+        ActivityLogger::make()
+            ->action(ActivityLog::ACTION_UPDATE, ActivityLog::GROUP_FILES)
+            ->on($file)
+            ->description("تعديل رقم الملف من: {$oldName} إلى: {$request->file_name}")
+            ->withNewValues(['file_name' => $request->file_name])
+            ->withOldValues(['file_name' => $oldName])
+            ->log();
+
+        return redirect()->back()->with('success', 'تم تعديل رقم الملف بنجاح');
+    }
+
+    /**
      * Get all districts
      */
     public function getDistricts()

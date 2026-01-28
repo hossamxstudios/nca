@@ -9,7 +9,7 @@
 <div class="modal fade" id="showAddFileModal" tabindex="-1">
     <div class="modal-dialog modal-fullscreen">
         <div class="modal-content">
-            <div class="modal-header bg-primary-subtle">
+            <div class="pt-2 pb-1 modal-header bg-primary-subtle">
                 <h5 class="modal-title">
                     <i class="ti ti-file-plus me-2"></i>إضافة ملف جديد
                     <span class="badge bg-primary ms-2">{{ $client->name }}</span>
@@ -23,12 +23,27 @@
                     <div class="row">
                         {{-- Left Side - PDF Preview --}}
                         <div class="col-md-4">
-                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center justify-content-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 180px);">
+                            <div class="p-3 rounded border pdf-preview-container d-flex flex-column align-items-center bg-light" style="position: sticky; top: 0; height: calc(100vh - 180px); overflow: hidden;">
+                                {{-- Rotation Controls --}}
+                                <div class="mb-2 btn-group btn-group-sm d-none" id="showAddFileRotationControls" style="position: relative; z-index: 10;">
+                                    <button type="button" class="btn btn-outline-secondary" id="showAddFileRotateLeft" title="تدوير لليسار">
+                                        <i class="ti ti-rotate-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="showAddFileRotateRight" title="تدوير لليمين">
+                                        <i class="ti ti-rotate-clockwise-2"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary" id="showAddFileRotateReset" title="إعادة تعيين">
+                                        <i class="ti ti-refresh"></i>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="rotation" id="showAddFileRotation" value="0">
                                 <div class="text-center w-100" id="showAddFilePdfPlaceholder">
                                     <i class="ti ti-file-type-pdf text-muted" style="font-size: 5rem;"></i>
                                     <p class="mt-3 text-muted">معاينة الصفحة الأولى ستظهر هنا</p>
                                 </div>
-                                <canvas class="d-none w-100" id="showAddFileCanvas"></canvas>
+                                <div class="flex-grow-1 d-flex align-items-center justify-content-center w-100" style="overflow: auto;">
+                                    <canvas class="d-none" id="showAddFileCanvas" style="transition: transform 0.3s ease; max-width: 100%;"></canvas>
+                                </div>
                             </div>
                         </div>
 
@@ -217,7 +232,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
+                <div class="pt-0 pb-0 modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                         <i class="ti ti-x me-1"></i>إلغاء
                     </button>
@@ -297,6 +312,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         page.render({ canvasContext: context, viewport: scaledViewport });
                         canvas.classList.remove('d-none');
                         document.getElementById('showAddFilePdfPlaceholder').classList.add('d-none');
+                        document.getElementById('showAddFileRotationControls').classList.remove('d-none');
                     });
                 });
             };
@@ -587,5 +603,42 @@ document.addEventListener('DOMContentLoaded', function() {
             select.disabled = false;
         });
     }
+
+    // Rotation functionality for add file modal
+    let showAddFileRotation = 0;
+
+    document.getElementById('showAddFileRotateLeft').addEventListener('click', function() {
+        showAddFileRotation -= 90;
+        applyShowAddFileRotation();
+    });
+
+    document.getElementById('showAddFileRotateRight').addEventListener('click', function() {
+        showAddFileRotation += 90;
+        applyShowAddFileRotation();
+    });
+
+    document.getElementById('showAddFileRotateReset').addEventListener('click', function() {
+        showAddFileRotation = 0;
+        applyShowAddFileRotation();
+    });
+
+    function applyShowAddFileRotation() {
+        const canvas = document.getElementById('showAddFileCanvas');
+        const rotationInput = document.getElementById('showAddFileRotation');
+
+        canvas.style.transform = `rotate(${showAddFileRotation}deg)`;
+        rotationInput.value = showAddFileRotation;
+    }
+
+    // Reset rotation when modal closes
+    document.getElementById('showAddFileModal').addEventListener('hidden.bs.modal', function() {
+        showAddFileRotation = 0;
+        const canvas = document.getElementById('showAddFileCanvas');
+        const rotationInput = document.getElementById('showAddFileRotation');
+        canvas.style.transform = '';
+        rotationInput.value = '0';
+        // Hide rotation controls
+        document.getElementById('showAddFileRotationControls').classList.add('d-none');
+    });
 });
 </script>
