@@ -161,15 +161,15 @@
                                             </div>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-info-subtle text-info">{{ $role->users_count }}</span>
+                                            <span class="badge bg-primary-subtle text-primary fs-5">{{ $role->users_count }}</span>
                                         </td>
                                         <td class="text-center">
-                                            <span class="badge bg-success-subtle text-success">{{ $role->permissions->count() }}</span>
+                                            <span class="badge bg-primary-subtle text-primary fs-5">{{ $role->permissions->count() }}</span>
                                         </td>
-                                        <td><small class="text-muted">{{ $role->created_at->format('Y/m/d') }}</small></td>
+                                        <td><span class="text-dark">{{ $role->created_at->format('Y/m/d') }}</span></td>
                                         <td class="text-center">
                                             <div class="gap-1 d-flex justify-content-center">
-                                                <a href="{{ route('admin.roles.show', $role->id) }}" class="px-2 btn btn-sm bg-info-subtle text-info" title="عرض">
+                                                <a href="{{ route('admin.roles.show', $role->id) }}" class="px-2 btn btn-sm bg-primary-subtle text-primary" title="عرض">
                                                     <i class="ti ti-eye"></i>
                                                 </a>
                                                 <a href="{{ route('admin.roles.edit', $role->id) }}" class="px-2 btn btn-sm bg-warning-subtle text-warning" title="تعديل">

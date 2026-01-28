@@ -87,7 +87,7 @@
                             @endif
                         </td>
                         <td class="text-center">
-                            <span class="badge bg-info-subtle text-info">{{ $firstFile->pages_count ?? 0 }}</span>
+                            <span class="badge bg-primary-subtle text-primary fs-6">{{ $firstFile->pages_count ?? 0 }}</span>
                         </td>
                         <td>
                             @if($firstFile->barcode)

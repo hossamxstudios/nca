@@ -114,7 +114,7 @@
                                     </div>
                                     <div class="col-6">
                                         <div class="p-1 rounded border">
-                                            <h3 class="mb-0 text-success fw-bold">
+                                            <h3 class="mb-0 text-dark fw-bold">
                                                 {{ $client->files->sum('pages_count') }}</h3>
                                             <span class="text-dark">صفحة</span>
                                         </div>
@@ -243,14 +243,12 @@
                                                 @endif
                                             @endcan
                                         </div>
-                                        <span class="badge bg-success-subtle text-success">{{ $totalExpectedPages }}
-                                            صفحة</span>
+                                        <span class="badge bg-primary-subtle fs-6 text-dark">{{ $totalExpectedPages }} صفحة</span>
                                         @if ($file->barcode)
                                             <code class="text-primary">{{ $file->barcode }}</code>
                                         @endif
                                     </div>
                                 </div>
-
                                 {{-- File Card Body - SubFiles/Pages --}}
                                 <div class="card-body">
                                     @if ($hasFileItems)
@@ -263,11 +261,10 @@
                                             @foreach ($fileItems as $fileItem)
                                                 <div class="col-md-4 col-lg-3">
                                                     <div class="p-3 text-center rounded border">
-                                                        <div
-                                                            class="mb-2 d-flex justify-content-between align-items-start">
+                                                        <div class="mb-2 d-flex justify-content-between align-items-start">
                                                             <h6 class="mb-0 fw-bold fs-4">
                                                                 {{ $fileItem->item->name ?? 'بند' }}</h6>
-                                                            <span class="badge bg-secondary fs-5">ص
+                                                            <span class="badge bg-primary fs-5">ص
                                                                 {{ $fileItem->from_page }} -
                                                                 {{ $fileItem->to_page }}</span>
                                                         </div>
@@ -275,33 +272,19 @@
                                                             {{-- PDF Thumbnail Preview (first page of range) --}}
                                                             <div class="mb-2 pdf-thumbnail-container"
                                                                 style="height: 120px; background: #f8f9fa; border-radius: 4px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
-                                                                <canvas class="pdf-thumbnail"
-                                                                    data-pdf-url="{{ $originalPdfUrl }}"
-                                                                    data-page="{{ $fileItem->from_page }}"
-                                                                    style="max-width: 100%; max-height: 100%;"></canvas>
+                                                                <canvas class="pdf-thumbnail" data-pdf-url="{{ $originalPdfUrl }}" data-page="{{ $fileItem->from_page }}" style="max-width: 100%; max-height: 100%;"></canvas>
                                                             </div>
                                                             <div class="gap-1 d-flex">
-                                                                <button type="button"
-                                                                    class="btn btn-sm btn-outline-primary flex-fill btn-preview-pdf"
-                                                                    data-pdf-url="{{ $originalPdfUrl }}"
-                                                                    data-from-page="{{ $fileItem->from_page }}"
-                                                                    data-to-page="{{ $fileItem->to_page }}"
-                                                                    data-title="{{ $fileItem->item->name ?? 'معاينة' }}"
-                                                                    data-client-id="{{ $client->id }}"
-                                                                    data-client-name="{{ $client->name }}"
-                                                                    data-file-name="{{ $file->file_name }}"
-                                                                    data-item-name="{{ $fileItem->item->name ?? 'بند' }}">
+                                                                <button type="button" class="btn btn-sm btn-outline-primary flex-fill btn-preview-pdf" data-pdf-url="{{ $originalPdfUrl }}" data-from-page="{{ $fileItem->from_page }}" data-to-page="{{ $fileItem->to_page }}" data-title="{{ $fileItem->item->name ?? 'معاينة' }}" data-client-id="{{ $client->id }}" data-client-name="{{ $client->name }}" data-file-name="{{ $file->file_name }}" data-item-name="{{ $fileItem->item->name ?? 'بند' }}">
                                                                     <i class="ti ti-eye me-1"></i>معاينة
                                                                 </button>
-                                                                <a href="{{ route('admin.files.download-pages', $file->id) }}?from_page={{ $fileItem->from_page }}&to_page={{ $fileItem->to_page }}&filename={{ urlencode($file->file_name . '_' . ($fileItem->item->name ?? 'بند') . '_ص' . $fileItem->from_page . '-' . $fileItem->to_page) }}"
-                                                                    class="btn btn-sm btn-outline-success flex-fill">
+                                                                <a href="{{ route('admin.files.download-pages', $file->id) }}?from_page={{ $fileItem->from_page }}&to_page={{ $fileItem->to_page }}&filename={{ urlencode($file->file_name . '_' . ($fileItem->item->name ?? 'بند') . '_ص' . $fileItem->from_page . '-' . $fileItem->to_page) }}" class="btn btn-sm btn-outline-primary flex-fill">
                                                                     <i class="ti ti-download me-1"></i>تحميل
                                                                 </a>
                                                             </div>
                                                         @else
                                                             <div class="py-4 text-muted small">
-                                                                <i class="mb-2 ti ti-file-off fs-3 d-block"></i>
-                                                                لا يوجد ملف مرفق
+                                                                <i class="mb-2 ti ti-file-off fs-3 d-block"></i> لا يوجد ملف مرفق
                                                             </div>
                                                         @endif
                                                     </div>
@@ -319,11 +302,8 @@
                                                                 $media = $subFile->getFirstMedia('pages');
                                                                 $thumbnailUrl = $media ? $media->getUrl('thumb') : '';
                                                             @endphp
-                                                            <img src="{{ $thumbnailUrl }}"
-                                                                alt="صفحة {{ $subFile->page_number ?? $subFile->file_name }}"
-                                                                class="mb-2 page-thumbnail"
-                                                                onerror="this.style.display='none'">
-                                                            <div class="mb-2 small fw-semibold">
+                                                            <img src="{{ $thumbnailUrl }}" alt="صفحة {{ $subFile->page_number ?? $subFile->file_name }}" class="mb-2 page-thumbnail" onerror="this.style.display='none'">
+                                                            <div class="mb-2 fw-semibold">
                                                                 @if ($subFile->page_number)
                                                                     صفحة {{ $subFile->page_number }}
                                                                 @else
@@ -331,22 +311,13 @@
                                                                 @endif
                                                             </div>
                                                             <div class="btn-group btn-group-sm">
-                                                                <button type="button"
-                                                                    class="btn btn-outline-primary btn-preview-page"
-                                                                    title="معاينة"
-                                                                    data-page-id="{{ $subFile->id }}">
+                                                                <button type="button" class="btn btn-outline-primary btn-preview-page" title="معاينة" data-page-id="{{ $subFile->id }}">
                                                                     <i class="ti ti-eye"></i>
                                                                 </button>
-                                                                <button type="button"
-                                                                    class="btn btn-outline-success btn-download-page"
-                                                                    title="تحميل"
-                                                                    data-page-id="{{ $subFile->id }}">
+                                                                <button type="button" class="btn btn-outline-success btn-download-page" title="تحميل" data-page-id="{{ $subFile->id }}">
                                                                     <i class="ti ti-download"></i>
                                                                 </button>
-                                                                <button type="button"
-                                                                    class="btn btn-outline-warning btn-replace-page"
-                                                                    title="استبدال"
-                                                                    data-page-id="{{ $subFile->id }}">
+                                                                <button type="button" class="btn btn-outline-warning btn-replace-page" title="استبدال" data-page-id="{{ $subFile->id }}">
                                                                     <i class="ti ti-refresh"></i>
                                                                 </button>
                                                             </div>

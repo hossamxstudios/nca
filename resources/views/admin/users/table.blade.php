@@ -39,7 +39,7 @@
                         <th>الهاتف</th>
                         <th>الصلاحية</th>
                         <th class="text-center">الحالة</th>
-                        <th>آخر دخول</th>
+                        {{-- <th>آخر دخول</th> --}}
                         <th class="text-center" style="width: 180px;">الإجراءات</th>
                     </tr>
                 </thead>
@@ -80,27 +80,27 @@
                         </td>
                         <td>
                             @forelse($user->roles as $role)
-                                <span class="badge bg-info-subtle text-info">{{ $role->name }}</span>
+                                <span class="badge bg-primary-subtle fs-5 text-primary">{{ $role->name }}</span>
                             @empty
                                 <span class="text-muted">-</span>
                             @endforelse
                         </td>
                         <td class="text-center">
                             @if($user->trashed())
-                                <span class="badge bg-secondary-subtle text-secondary">محذوف</span>
+                                <span class="badge bg-secondary-subtle fs-5 text-secondary">محذوف</span>
                             @elseif($user->is_active)
-                                <span class="badge bg-success-subtle text-success">نشط</span>
+                                <span class="badge bg-primary-subtle fs-5 text-primary">نشط</span>
                             @else
-                                <span class="badge bg-danger-subtle text-danger">غير نشط</span>
+                                <span class="badge bg-danger-subtle fs-5 text-danger">غير نشط</span>
                             @endif
                         </td>
-                        <td>
+                        {{-- <td>
                             @if($user->last_login_at)
                                 <small class="text-muted">{{ $user->last_login_at->diffForHumans() }}</small>
                             @else
                                 <small class="text-muted">لم يسجل دخول</small>
                             @endif
-                        </td>
+                        </td> --}}
                         <td class="text-center">
                             <div class="gap-1 d-flex justify-content-center">
                                 @if($user->trashed())

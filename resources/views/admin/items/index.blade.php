@@ -16,20 +16,20 @@
                 {{-- Page Header --}}
                 <div class="row">
                     <div class="col-12">
-                        <div class="mb-2 mt-3 page-title-box">
-                            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between py-2 px-3 bg-body border border-secondary border-opacity-10 shadow-sm rounded-3">
+                        <div class="mt-3 mb-2 page-title-box">
+                            <div class="px-3 py-2 border border-opacity-10 shadow-sm d-flex flex-column flex-lg-row align-items-lg-center justify-content-between bg-body border-secondary rounded-3">
                                 <div>
-                                    <span class="badge bg-primary-subtle text-primary fw-normal shadow-sm px-2 d-inline-flex align-items-center">
+                                    <span class="px-2 shadow-sm badge bg-primary-subtle text-primary fw-normal d-inline-flex align-items-center">
                                         <i class="ti ti-tags me-1"></i> أنواع المحتوى
                                     </span>
                                     <nav aria-label="breadcrumb">
-                                        <ol class="breadcrumb mb-0 mt-1">
+                                        <ol class="mt-1 mb-0 breadcrumb">
                                             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">لوحة التحكم</a></li>
                                             <li class="breadcrumb-item active">أنواع المحتوى</li>
                                         </ol>
                                     </nav>
                                 </div>
-                                <div class="d-flex gap-2 mt-2 mt-lg-0">
+                                <div class="gap-2 mt-2 d-flex mt-lg-0">
                                     @can('items.create')
                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addItemModal">
                                         <i class="ti ti-plus me-1"></i> إضافة نوع محتوى
@@ -42,47 +42,47 @@
                 </div>
 
                 {{-- Stats Cards --}}
-                <div class="row g-3 mb-4">
+                <div class="mb-4 row g-3">
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-primary-subtle text-primary rounded">
+                                    <div class="rounded avatar avatar-md bg-primary-subtle text-primary">
                                         <i class="ti ti-tags fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['total'] }}</h4>
-                                        <small class="text-muted">إجمالي الأنواع</small>
+                                        <span class="text-dark">إجمالي الأنواع</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-success-subtle text-success rounded">
+                                    <div class="rounded avatar avatar-md bg-success-subtle text-success">
                                         <i class="ti ti-file-check fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['with_files'] }}</h4>
-                                        <small class="text-muted">مرتبط بملفات</small>
+                                        <span class="text-dark">مرتبط بملفات</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col-md-4">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-warning-subtle text-warning rounded">
+                                    <div class="rounded avatar avatar-md bg-warning-subtle text-warning">
                                         <i class="ti ti-file-off fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['without_files'] }}</h4>
-                                        <small class="text-muted">غير مستخدم</small>
+                                        <span class="text-dark">غير مستخدم</span>
                                     </div>
                                 </div>
                             </div>
@@ -93,16 +93,16 @@
                 {{-- Data Table --}}
                 <div class="row">
                     <div class="col-12">
-                        <div class="card border-0 shadow-sm rounded-3">
+                        <div class="border-0 shadow-sm card rounded-3">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-3">
-                                    <h5 class="card-title mb-0">قائمة أنواع المحتوى</h5>
+                                <div class="gap-3 d-flex align-items-center">
+                                    <h5 class="mb-0 card-title">قائمة أنواع المحتوى</h5>
                                     <span class="badge bg-primary-subtle text-primary">{{ count($items) }} نوع</span>
                                 </div>
                             </div>
-                            <div class="card-body p-0">
+                            <div class="p-0 card-body">
                                 <div class="table-responsive">
-                                    <table class="table table-hover mb-0">
+                                    <table class="table mb-0 table-hover">
                                         <thead class="bg-light">
                                             <tr>
                                                 <th width="60">الترتيب</th>
@@ -120,24 +120,24 @@
                                                 </td>
                                                 <td>
                                                     <div class="d-flex align-items-center">
-                                                        <div class="avatar avatar-sm bg-primary-subtle text-primary rounded me-2 d-flex align-items-center justify-content-center">
+                                                        <div class="rounded avatar avatar-sm bg-primary-subtle text-primary me-2 d-flex align-items-center justify-content-center">
                                                             <i class="ti ti-tag"></i>
                                                         </div>
                                                         <span class="fw-medium">{{ $item->name }}</span>
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span class="text-muted">{{ $item->description ?: '-' }}</span>
+                                                    <span class="text-dark">{{ $item->description ?: '-' }}</span>
                                                 </td>
                                                 <td>
                                                     @if($item->files_count > 0)
-                                                    <span class="badge bg-success">{{ $item->files_count }} ملف</span>
+                                                    <span class="badge bg-primary fs-5">{{ $item->files_count }} ملف</span>
                                                     @else
-                                                    <span class="badge bg-secondary">0</span>
+                                                    <span class="badge bg-primary fs-5">0</span>
                                                     @endif
                                                 </td>
                                                 <td class="text-center">
-                                                    <div class="d-flex justify-content-center gap-1">
+                                                    <div class="gap-1 d-flex justify-content-center">
                                                         @can('items.edit')
                                                         <button class="btn btn-soft-warning btn-sm" data-bs-toggle="modal" data-bs-target="#editItemModal_{{ $item->id }}" title="تعديل">
                                                             <i class="ti ti-edit"></i>
@@ -158,9 +158,9 @@
                                             </tr>
                                             @empty
                                             <tr>
-                                                <td colspan="5" class="text-center py-5">
+                                                <td colspan="5" class="py-5 text-center">
                                                     <div class="text-muted">
-                                                        <i class="ti ti-tags-off fs-1 d-block mb-2"></i>
+                                                        <i class="mb-2 ti ti-tags-off fs-1 d-block"></i>
                                                         <p class="mb-2">لا توجد أنواع محتوى</p>
                                                         @can('items.create')
                                                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addItemModal">

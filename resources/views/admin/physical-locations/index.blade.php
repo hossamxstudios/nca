@@ -16,20 +16,20 @@
                 {{-- Page Header --}}
                 <div class="row">
                     <div class="col-12">
-                        <div class="mb-2 mt-3 page-title-box">
-                            <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between py-2 px-3 bg-body border border-secondary border-opacity-10 shadow-sm rounded-3">
+                        <div class="mt-3 mb-2 page-title-box">
+                            <div class="px-3 py-2 border border-opacity-10 shadow-sm d-flex flex-column flex-lg-row align-items-lg-center justify-content-between bg-body border-secondary rounded-3">
                                 <div>
-                                    <span class="badge bg-primary-subtle text-primary fw-normal shadow-sm px-2 d-inline-flex align-items-center">
+                                    <span class="px-2 shadow-sm badge bg-primary-subtle text-primary fw-normal d-inline-flex align-items-center">
                                         <i class="ti ti-building-warehouse me-1"></i> مواقع التخزين
                                     </span>
                                     <nav aria-label="breadcrumb">
-                                        <ol class="breadcrumb mb-0 mt-1">
+                                        <ol class="mt-1 mb-0 breadcrumb">
                                             <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">لوحة التحكم</a></li>
                                             <li class="breadcrumb-item active">مواقع التخزين</li>
                                         </ol>
                                     </nav>
                                 </div>
-                                <div class="d-flex gap-2 mt-2 mt-lg-0">
+                                <div class="gap-2 mt-2 d-flex mt-lg-0">
                                     @can('physical_locations.create')
                                     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRoomModal">
                                         <i class="ti ti-plus me-1"></i> إضافة غرفة
@@ -42,62 +42,62 @@
                 </div>
 
                 {{-- Stats Cards --}}
-                <div class="row g-3 mb-4">
+                <div class="mb-4 row g-3">
                     <div class="col">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-primary-subtle text-primary rounded">
+                                    <div class="rounded avatar avatar-md bg-primary-subtle text-primary">
                                         <i class="ti ti-home fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['rooms'] }}</h4>
-                                        <small class="text-muted">الغرف</small>
+                                        <span class="text-dark">الغرف</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-success-subtle text-success rounded">
+                                    <div class="rounded avatar avatar-md bg-success-subtle text-success">
                                         <i class="ti ti-road fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['lanes'] }}</h4>
-                                        <small class="text-muted">الممرات</small>
+                                        <span class="text-dark">الممرات</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-info-subtle text-info rounded">
+                                    <div class="rounded avatar avatar-md bg-info-subtle text-info">
                                         <i class="ti ti-layout-list fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['stands'] }}</h4>
-                                        <small class="text-muted">الحوامل</small>
+                                        <span class="text-dark">الحوامل</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="col">
-                        <div class="card border-0 shadow-sm">
+                        <div class="border-0 shadow-sm card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center">
-                                    <div class="avatar avatar-md bg-warning-subtle text-warning rounded">
+                                    <div class="rounded avatar avatar-md bg-warning-subtle text-warning">
                                         <i class="ti ti-archive fs-4"></i>
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['racks'] }}</h4>
-                                        <small class="text-muted">الأدراج</small>
+                                        <span class="text-dark">الأدراج</span>
                                     </div>
                                 </div>
                             </div>
@@ -108,13 +108,13 @@
                 {{-- Data Table --}}
                 <div class="row">
                     <div class="col-12">
-                        <div class="card border-0 shadow-sm rounded-3">
+                        <div class="border-0 shadow-sm card rounded-3">
                             <div class="card-header d-flex justify-content-between align-items-center">
-                                <div class="d-flex align-items-center gap-3">
-                                    <h5 class="card-title mb-0">الغرف ومواقع التخزين</h5>
+                                <div class="gap-3 d-flex align-items-center">
+                                    <h5 class="mb-0 card-title">الغرف ومواقع التخزين</h5>
                                     <span class="badge bg-primary-subtle text-primary">{{ count($rooms) }} غرفة</span>
                                 </div>
-                                <div class="d-flex align-items-center gap-2">
+                                <div class="gap-2 d-flex align-items-center">
                                     <div class="btn-group" role="group">
                                         <button type="button" class="btn btn-sm btn-outline-secondary active" id="listViewBtn" onclick="toggleView('list')">
                                             <i class="ti ti-list"></i>
@@ -125,10 +125,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="card-body p-0">
+                            <div class="p-0 card-body">
                                 {{-- List View --}}
                                 <div id="listView" class="table-responsive">
-                                    <table class="table table-hover mb-0">
+                                    <table class="table mb-0 table-hover">
                                         <thead class="bg-light">
                                             <tr>
                                                 <th>#</th>
@@ -148,14 +148,14 @@
                                             @endphp
                                             <tr>
                                                 <td>{{ $loop->iteration }}</td>
-                                                <td><span class="text-muted">{{ $room->building_name ?: '-' }}</span></td>
+                                                <td><span class="text-dark">{{ $room->building_name ?: '-' }}</span></td>
                                                 <td><span class="fw-medium">{{ $room->name }}</span></td>
-                                                <td><span class="badge bg-success">{{ $room->lanes->count() }}</span></td>
-                                                <td><span class="badge bg-info">{{ $standsTotal }}</span></td>
-                                                <td><span class="badge bg-warning">{{ $racksTotal }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $room->lanes->count() }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $standsTotal }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $racksTotal }}</span></td>
                                                 <td class="text-center">
-                                                    <div class="d-flex justify-content-center gap-1">
-                                                        <button class="btn btn-soft-info btn-sm" onclick="showRoom({{ $room->id }}, '{{ $room->name }}')" title="عرض التفاصيل">
+                                                    <div class="gap-1 d-flex justify-content-center">
+                                                        <button class="btn btn-soft-primary btn-sm" onclick="showRoom({{ $room->id }}, '{{ $room->name }}')" title="عرض التفاصيل">
                                                             <i class="ti ti-eye"></i>
                                                         </button>
                                                         @can('physical_locations.create')
@@ -183,9 +183,9 @@
                                             </tr>
                                             @empty
                                             <tr>
-                                                <td colspan="7" class="text-center py-5">
+                                                <td colspan="7" class="py-5 text-center">
                                                     <div class="text-muted">
-                                                        <i class="ti ti-building-warehouse fs-1 d-block mb-2"></i>
+                                                        <i class="mb-2 ti ti-building-warehouse fs-1 d-block"></i>
                                                         <p class="mb-2">لا توجد غرف</p>
                                                         @can('physical_locations.create')
                                                         <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addRoomModal">
@@ -201,7 +201,7 @@
                                 </div>
 
                                 {{-- Card View --}}
-                                <div id="cardView" class="d-none p-3">
+                                <div id="cardView" class="p-3 d-none">
                                     <div class="row g-3">
                                         @forelse($rooms as $room)
                                         @php
@@ -209,9 +209,9 @@
                                             $racksTotal = $room->lanes->sum(fn($l) => $l->stands->sum(fn($s) => $s->racks->count()));
                                         @endphp
                                         <div class="col-md-4 col-lg-3">
-                                            <div class="card border shadow-sm h-100">
+                                            <div class="border shadow-sm card h-100">
                                                 <div class="card-body">
-                                                    <div class="d-flex align-items-center mb-3">
+                                                    <div class="mb-3 d-flex align-items-center">
                                                         <div class="avatar avatar-md bg-primary-subtle text-primary rounded-circle me-3 d-flex align-items-center justify-content-center">
                                                             <i class="ti ti-home"></i>
                                                         </div>
@@ -220,13 +220,13 @@
                                                             <small class="text-muted">{{ $room->building_name ?: 'بدون مبنى' }}</small>
                                                         </div>
                                                     </div>
-                                                    <div class="d-flex flex-wrap gap-2 mb-3">
+                                                    <div class="flex-wrap gap-2 mb-3 d-flex">
                                                         <span class="badge bg-success-subtle text-success"><i class="ti ti-road me-1"></i>{{ $room->lanes->count() }} ممر</span>
                                                         <span class="badge bg-info-subtle text-info"><i class="ti ti-layout-list me-1"></i>{{ $standsTotal }} حامل</span>
                                                         <span class="badge bg-warning-subtle text-warning"><i class="ti ti-archive me-1"></i>{{ $racksTotal }} درج</span>
                                                     </div>
                                                 </div>
-                                                <div class="card-footer bg-transparent border-top-0 pt-0">
+                                                <div class="pt-0 bg-transparent card-footer border-top-0">
                                                     <div class="d-flex justify-content-between">
                                                         <button class="btn btn-soft-info btn-sm" onclick="showRoom({{ $room->id }}, '{{ $room->name }}')"><i class="ti ti-eye"></i></button>
                                                         @can('physical_locations.create')
@@ -248,9 +248,9 @@
                                             </div>
                                         </div>
                                         @empty
-                                        <div class="col-12 text-center py-4">
+                                        <div class="py-4 text-center col-12">
                                             <div class="text-muted">
-                                                <i class="ti ti-building-warehouse fs-1 d-block mb-2"></i>
+                                                <i class="mb-2 ti ti-building-warehouse fs-1 d-block"></i>
                                                 لا توجد غرف
                                             </div>
                                         </div>
@@ -365,27 +365,27 @@
     {{-- Show Room Modal (Hierarchy View) --}}
     <div class="modal fade" id="showRoomModal" tabindex="-1" data-bs-backdrop="static">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
-            <div class="modal-content border-0 shadow">
+            <div class="border-0 shadow modal-content">
                 <div class="modal-header border-bottom">
                     <div class="d-flex align-items-center">
-                        <div class="avatar avatar-sm bg-primary-subtle text-primary rounded me-2">
+                        <div class="rounded avatar avatar-sm bg-primary-subtle text-primary me-2">
                             <i class="ti ti-building-warehouse"></i>
                         </div>
                         <div>
-                            <h5 class="modal-title mb-0 fw-semibold" id="showRoomName"></h5>
+                            <h5 class="mb-0 modal-title fw-semibold" id="showRoomName"></h5>
                             <small class="text-muted">هيكل التخزين</small>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
+                    <div class="gap-2 d-flex align-items-center">
                         <button type="button" class="btn btn-outline-secondary btn-sm" onclick="refreshRoomData()" title="تحديث">
                             <i class="ti ti-refresh"></i>
                         </button>
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                 </div>
-                <div class="modal-body p-0" style="max-height: 70vh; overflow-y: auto;">
+                <div class="p-0 modal-body" style="max-height: 70vh; overflow-y: auto;">
                     <div id="showRoomBody">
-                        <div class="text-center py-5">
+                        <div class="py-5 text-center">
                             <div class="spinner-border text-primary"></div>
                             <p class="mt-3 text-muted">جاري التحميل...</p>
                         </div>
@@ -559,7 +559,7 @@
         function showRoom(id, name) {
             document.getElementById('showRoomName').textContent = name;
             document.getElementById('currentRoomId').value = id;
-            document.getElementById('showRoomBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div><p class="mt-3 text-muted">جاري تحميل البيانات...</p></div>';
+            document.getElementById('showRoomBody').innerHTML = '<div class="py-5 text-center"><div class="spinner-border text-primary" style="width: 3rem; height: 3rem;"></div><p class="mt-3 text-muted">جاري تحميل البيانات...</p></div>';
             new bootstrap.Modal(document.getElementById('showRoomModal')).show();
             loadRoomData(id);
         }
@@ -573,19 +573,19 @@
                 if (data.success) {
                     renderLanesList(data.room);
                 } else {
-                    document.getElementById('showRoomBody').innerHTML = '<div class="alert alert-danger m-3">حدث خطأ أثناء التحميل</div>';
+                    document.getElementById('showRoomBody').innerHTML = '<div class="m-3 alert alert-danger">حدث خطأ أثناء التحميل</div>';
                 }
             })
             .catch(err => {
                 console.error('Error:', err);
-                document.getElementById('showRoomBody').innerHTML = '<div class="alert alert-danger m-3">حدث خطأ في الاتصال</div>';
+                document.getElementById('showRoomBody').innerHTML = '<div class="m-3 alert alert-danger">حدث خطأ في الاتصال</div>';
             });
         }
 
         function refreshRoomData() {
             const id = document.getElementById('currentRoomId').value;
             if (id) {
-                document.getElementById('showRoomBody').innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">جاري تحديث البيانات...</p></div>';
+                document.getElementById('showRoomBody').innerHTML = '<div class="py-5 text-center"><div class="spinner-border text-primary"></div><p class="mt-3 text-muted">جاري تحديث البيانات...</p></div>';
                 loadRoomData(id);
             }
         }
@@ -594,11 +594,11 @@
             const lanes = room.lanes || [];
             if (lanes.length === 0) {
                 document.getElementById('showRoomBody').innerHTML = `
-                <div class="text-center py-5">
-                    <div class="avatar avatar-lg bg-dark-subtle text-dark rounded-circle mx-auto mb-3 d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
+                <div class="py-5 text-center">
+                    <div class="mx-auto mb-3 avatar avatar-lg bg-dark-subtle text-dark rounded-circle d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
                         <i class="ti ti-road fs-2"></i>
                     </div>
-                    <h6 class="text-muted mb-3">لا توجد ممرات مضافة</h6>
+                    <h6 class="mb-3 text-muted">لا توجد ممرات مضافة</h6>
                 </div>`;
                 return;
             }
@@ -611,18 +611,18 @@
             });
 
             let html = `
-            <div class="bg-light border-bottom p-3">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div class="d-flex flex-wrap gap-2">
-                        <div class="bg-white rounded px-3 py-2 shadow-sm">
+            <div class="p-3 bg-light border-bottom">
+                <div class="flex-wrap gap-2 d-flex justify-content-between align-items-center">
+                    <div class="flex-wrap gap-2 d-flex">
+                        <div class="px-3 py-2 bg-white rounded shadow-sm">
                             <span class="fs-5 fw-bold text-success">${lanes.length}</span>
                             <span class="text-muted small ms-1">ممر</span>
                         </div>
-                        <div class="bg-white rounded px-3 py-2 shadow-sm">
+                        <div class="px-3 py-2 bg-white rounded shadow-sm">
                             <span class="fs-5 fw-bold text-info">${totalStands}</span>
                             <span class="text-muted small ms-1">حامل</span>
                         </div>
-                        <div class="bg-white rounded px-3 py-2 shadow-sm">
+                        <div class="px-3 py-2 bg-white rounded shadow-sm">
                             <span class="fs-5 fw-bold text-warning">${totalRacks}</span>
                             <span class="text-muted small ms-1">درج</span>
                         </div>
@@ -634,8 +634,8 @@
             lanes.forEach((lane, idx) => {
                 const stands = lane.stands || [];
                 html += `
-                <div class="card mb-2 border shadow-sm">
-                    <div class="card-header bg-light py-2 d-flex justify-content-between align-items-center">
+                <div class="mb-2 border shadow-sm card">
+                    <div class="py-2 card-header bg-light d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#lane${lane.id}">
                             <i class="ti ti-chevron-down me-2 text-success"></i>
                             <i class="ti ti-road text-success me-2 fs-5"></i>
@@ -649,12 +649,12 @@
                         </div>
                     </div>
                     <div class="collapse ${idx === 0 ? 'show' : ''}" id="lane${lane.id}">
-                        <div class="card-body py-2">
+                        <div class="py-2 card-body">
                             ${stands.length > 0 ? stands.map(stand => {
                                 const racks = stand.racks || [];
                                 return `
-                                <div class="card mb-2 border-0 bg-light">
-                                    <div class="card-header bg-transparent py-2 d-flex justify-content-between align-items-center border-0">
+                                <div class="mb-2 border-0 card bg-light">
+                                    <div class="py-2 bg-transparent border-0 card-header d-flex justify-content-between align-items-center">
                                         <div class="d-flex align-items-center" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#stand${stand.id}">
                                             <i class="ti ti-chevron-down me-2 text-info"></i>
                                             <i class="ti ti-layout-list text-info me-2"></i>
@@ -668,12 +668,12 @@
                                         </div>
                                     </div>
                                     <div class="collapse" id="stand${stand.id}">
-                                        <div class="card-body py-2">
+                                        <div class="py-2 card-body">
                                             ${racks.length > 0 ? `
                                                 <div class="row g-2">
                                                     ${racks.map(rack => `
                                                         <div class="col-md-6 col-lg-4">
-                                                            <div class="d-flex justify-content-between align-items-center p-2 bg-warning-subtle rounded">
+                                                            <div class="p-2 rounded d-flex justify-content-between align-items-center bg-warning-subtle">
                                                                 <div class="d-flex align-items-center">
                                                                     <i class="ti ti-archive text-warning me-2"></i>
                                                                     <span class="fw-medium">${rack.name}</span>
@@ -687,11 +687,11 @@
                                                         </div>
                                                     `).join('')}
                                                 </div>
-                                            ` : '<p class="text-muted small mb-0">لا توجد أدراج</p>'}
+                                            ` : '<p class="mb-0 text-muted small">لا توجد أدراج</p>'}
                                         </div>
                                     </div>
                                 </div>`;
-                            }).join('') : '<p class="text-muted small mb-0">لا توجد حوامل</p>'}
+                            }).join('') : '<p class="mb-0 text-muted small">لا توجد حوامل</p>'}
                         </div>
                     </div>
                 </div>`;

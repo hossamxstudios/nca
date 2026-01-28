@@ -52,7 +52,7 @@
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['governorates'] }}</h4>
-                                        <small class="text-muted">المحافظات</small>
+                                        <span class="text-dark">المحافظات</span>
                                     </div>
                                 </div>
                             </div>
@@ -67,7 +67,7 @@
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['cities'] }}</h4>
-                                        <small class="text-muted">المدن</small>
+                                        <span class="text-dark">المدن</span>
                                     </div>
                                 </div>
                             </div>
@@ -82,7 +82,7 @@
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['districts'] }}</h4>
-                                        <small class="text-muted">الأحياء</small>
+                                        <span class="text-dark">الأحياء</span>
                                     </div>
                                 </div>
                             </div>
@@ -97,7 +97,7 @@
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['zones'] }}</h4>
-                                        <small class="text-muted">المناطق</small>
+                                        <span class="text-dark">المناطق</span>
                                     </div>
                                 </div>
                             </div>
@@ -112,7 +112,7 @@
                                     </div>
                                     <div class="ms-3">
                                         <h4 class="mb-0">{{ $stats['areas'] }}</h4>
-                                        <small class="text-muted">الأقسام</small>
+                                        <span class="text-dark">الأقسام</span>
                                     </div>
                                 </div>
                             </div>
@@ -127,7 +127,7 @@
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <div class="gap-3 d-flex align-items-center">
                                     <h5 class="mb-0 card-title">المحافظات والمدن</h5>
-                                    <span class="badge bg-primary-subtle text-primary">{{ count($governorates) }} محافظة</span>
+                                    <span class="badge bg-primary-subtle text-primary fs-6">{{ count($governorates) }} محافظة</span>
                                 </div>
                                 <div class="gap-2 d-flex align-items-center">
                                     <div class="btn-group" role="group">
@@ -167,13 +167,13 @@
                                                 <td>
                                                     <span class="fw-medium">{{ $governorate->name }}</span>
                                                 </td>
-                                                <td><span class="badge bg-success">{{ $governorate->cities->count() }}</span></td>
-                                                <td><span class="badge bg-info">{{ $districtsTotal }}</span></td>
-                                                <td><span class="badge bg-warning">{{ $zonesTotal }}</span></td>
-                                                <td><span class="badge bg-danger">{{ $areasTotal }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $governorate->cities->count() }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $districtsTotal }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $zonesTotal }}</span></td>
+                                                <td><span class="badge bg-primary fs-5">{{ $areasTotal }}</span></td>
                                                 <td class="text-center">
                                                     <div class="gap-1 d-flex justify-content-center">
-                                                        <button class="btn btn-soft-info btn-sm" onclick="showGovernorate({{ $governorate->id }}, '{{ $governorate->name }}')" title="عرض التفاصيل">
+                                                        <button class="btn btn-soft-primary btn-sm" onclick="showGovernorate({{ $governorate->id }}, '{{ $governorate->name }}')" title="عرض التفاصيل">
                                                             <i class="ti ti-eye"></i>
                                                         </button>
                                                         @can('geographic_areas.create')

@@ -51,7 +51,7 @@
                                 <hr class="my-3">
                                 <div class="mb-3 d-flex align-items-center">
                                     <div class="avatar-xs me-3">
-                                        <span class="avatar-title bg-info-subtle text-info rounded-circle">
+                                        <span class="avatar-title bg-primary-subtle text-primary rounded-circle">
                                             <i class="ti ti-users"></i>
                                         </span>
                                     </div>
@@ -59,7 +59,7 @@
                                 </div>
                                 <div class="mb-3 d-flex align-items-center">
                                     <div class="avatar-xs me-3">
-                                        <span class="avatar-title bg-success-subtle text-success rounded-circle">
+                                        <span class="avatar-title bg-primary-subtle text-primary rounded-circle">
                                             <i class="ti ti-key"></i>
                                         </span>
                                     </div>
@@ -67,7 +67,7 @@
                                 </div>
                                 <div class="d-flex align-items-center">
                                     <div class="avatar-xs me-3">
-                                        <span class="avatar-title bg-warning-subtle text-warning rounded-circle">
+                                        <span class="avatar-title bg-primary-subtle text-primary rounded-circle">
                                             <i class="ti ti-calendar"></i>
                                         </span>
                                     </div>
@@ -83,7 +83,7 @@
                             </div>
                             <div class="card-body">
                                 <div class="gap-2 d-grid">
-                                    <a href="{{ route('admin.roles.edit', $role->id) }}" class="btn btn-outline-warning">
+                                    <a href="{{ route('admin.roles.edit', $role->id) }}" class="btn btn-outline-primary">
                                         <i class="ti ti-edit me-1"></i>تعديل الصلاحية
                                     </a>
                                     <a href="{{ route('admin.roles.index') }}" class="btn btn-outline-secondary">
@@ -121,7 +121,7 @@
                                         <h2 class="accordion-header">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#show_{{ Str::slug($module) }}">
                                                 <i class="ti ti-folder me-2"></i>{{ $moduleNameAr }}
-                                                <span class="badge bg-success ms-2">
+                                                <span class="badge bg-primary fs-6 ms-2">
                                                     {{ $modulePermissions->pluck('name')->intersect($rolePermNames)->count() }}
                                                 </span>
                                             </button>
@@ -132,8 +132,6 @@
                                                     @foreach($modulePermissions as $permission)
                                                     @if($role->hasPermissionTo($permission->name))
                                                     @php
-                                                        // Dynamic translation: extract action from permission name
-                                                        // Supports: clients.view -> view, clients.bulk-delete -> bulk-delete
                                                         $permName = $permission->name;
                                                         $action = '';
                                                         if (str_contains($permName, '.')) {
@@ -143,7 +141,7 @@
                                                         $permNameAr = $actionTranslations[$action] ?? $action ?: $permName;
                                                     @endphp
                                                     <div class="col-md-4 col-sm-6">
-                                                        <span class="badge bg-success-subtle text-success fs-5">
+                                                        <span class="badge bg-primary-subtle text-primary fs-5">
                                                             <i class="ti ti-check me-1"></i>{{ $permNameAr }}
                                                         </span>
                                                     </div>

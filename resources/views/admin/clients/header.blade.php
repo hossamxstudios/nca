@@ -9,7 +9,7 @@
         </div>
         <div class="col">
             <h4 class="mb-1">إدارة العملاء</h4>
-            <div class="text-secondary">
+            <div class="text-primary">
                 <span class="badge bg-primary-subtle text-primary me-2">{{ \App\Models\Client::count() }} عميل</span>
                 عرض وإدارة جميع العملاء والملفات المرتبطة بهم
             </div>
