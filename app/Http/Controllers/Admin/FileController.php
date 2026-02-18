@@ -31,9 +31,9 @@ class FileController extends Controller {
     public function upload(Request $request, File $file)
     {
         $request->validate([
-            'pdf_file' => 'required|file|mimes:pdf|max:102400',
+            'pdf_file' => 'required|file|mimes:pdf|max:1024000',
             'extra_pdf_files' => 'nullable|array',
-            'extra_pdf_files.*' => 'file|mimes:pdf|max:102400',
+            'extra_pdf_files.*' => 'file|mimes:pdf|max:1024000',
             'items' => 'nullable|array',
             'items.*.enabled' => 'nullable',
             'items.*.from_page' => 'nullable|integer|min:1',
@@ -270,7 +270,7 @@ class FileController extends Controller {
     {
         $request->validate([
             'additional_files' => 'required|array|min:1',
-            'additional_files.*' => 'file|mimes:pdf|max:102400',
+            'additional_files.*' => 'file|mimes:pdf|max:1024000',
         ]);
 
         DB::beginTransaction();
@@ -397,9 +397,9 @@ class FileController extends Controller {
     {
         $request->validate([
             'file_name' => 'required|string|max:255',
-            'pdf_file' => 'required|file|mimes:pdf|max:102400',
+            'pdf_file' => 'required|file|mimes:pdf|max:1024000',
             'extra_pdf_files' => 'nullable|array',
-            'extra_pdf_files.*' => 'file|mimes:pdf|max:102400',
+            'extra_pdf_files.*' => 'file|mimes:pdf|max:1024000',
             'district_id' => 'required|exists:districts,id',
             'zone_id' => 'required|exists:zones,id',
             'area_id' => 'nullable|exists:areas,id',
