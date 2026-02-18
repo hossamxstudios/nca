@@ -436,13 +436,37 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         document.addEventListener('DOMContentLoaded', function() {
-            // Render PDF thumbnails
+            // Lazy load PDF thumbnails using IntersectionObserver
+            const thumbnailObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const canvas = entry.target;
+                        const pdfUrl = canvas.dataset.pdfUrl;
+                        const pageNum = parseInt(canvas.dataset.page) || 1;
+                        if (pdfUrl && !canvas.dataset.loaded) {
+                            canvas.dataset.loaded = 'true';
+                            renderPdfThumbnail(pdfUrl, canvas, pageNum);
+                        }
+                        observer.unobserve(canvas);
+                    }
+                });
+            }, {
+                rootMargin: '100px', // Start loading slightly before visible
+                threshold: 0.1
+            });
+
+            // Observe all PDF thumbnails
             document.querySelectorAll('.pdf-thumbnail').forEach(function(canvas) {
-                const pdfUrl = canvas.dataset.pdfUrl;
-                const pageNum = parseInt(canvas.dataset.page) || 1;
-                if (pdfUrl) {
-                    renderPdfThumbnail(pdfUrl, canvas, pageNum);
+                // Add loading placeholder
+                const container = canvas.parentElement;
+                if (container && !container.querySelector('.thumbnail-loader')) {
+                    const loader = document.createElement('div');
+                    loader.className = 'thumbnail-loader position-absolute top-50 start-50 translate-middle';
+                    loader.innerHTML = '<div class="spinner-border spinner-border-sm text-secondary" role="status"></div>';
+                    container.style.position = 'relative';
+                    container.appendChild(loader);
                 }
+                thumbnailObserver.observe(canvas);
             });
 
             // Handle preview button click
@@ -580,7 +604,7 @@
         const pdfDocumentCache = new Map();
         const canvasRenderingState = new WeakMap();
 
-        async function getCachedPdfDocument(pdfUrl) {
+        async function getCachedPdfDocument(pdfUrl, onProgress = null) {
             if (pdfDocumentCache.has(pdfUrl)) {
                 return pdfDocumentCache.get(pdfUrl);
             }
@@ -588,7 +612,20 @@
                 url: pdfUrl,
                 cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
                 cMapPacked: true,
+                disableAutoFetch: true,  // Load pages on demand, not all at once
+                disableStream: false,    // Allow streaming for faster initial load
             });
+
+            // Track download progress
+            if (onProgress) {
+                loadingTask.onProgress = function(progress) {
+                    if (progress.total > 0) {
+                        const percent = Math.round((progress.loaded / progress.total) * 100);
+                        onProgress(percent);
+                    }
+                };
+            }
+
             const pdf = await loadingTask.promise;
             pdfDocumentCache.set(pdfUrl, pdf);
             return pdf;
@@ -601,11 +638,15 @@
             }
             canvasRenderingState.set(canvas, true);
 
+            const container = canvas.parentElement;
+            const loader = container?.querySelector('.thumbnail-loader');
+
             try {
                 const pdf = await getCachedPdfDocument(pdfUrl);
                 const page = await pdf.getPage(pageNum);
 
-                const containerHeight = 120;
+                // Use lower resolution for faster rendering (80px height instead of 120)
+                const containerHeight = 80;
                 const viewport = page.getViewport({ scale: 1 });
                 const scale = containerHeight / viewport.height;
                 const scaledViewport = page.getViewport({ scale: scale });
@@ -618,8 +659,15 @@
                     canvasContext: context,
                     viewport: scaledViewport
                 }).promise;
+
+                // Remove loader on success
+                if (loader) loader.remove();
             } catch (error) {
                 console.error('Error loading PDF thumbnail:', error);
+                // Show error icon instead of loader
+                if (loader) {
+                    loader.innerHTML = '<i class="ti ti-photo-off text-muted"></i>';
+                }
             } finally {
                 canvasRenderingState.set(canvas, false);
             }
@@ -668,11 +716,19 @@
                     <div class="text-center text-white" id="pdfLoadingIndicator">
                         <div class="spinner-border" role="status"></div>
                         <p class="mt-2">جاري تحميل الملف...</p>
-                        <small class="text-white-50">0%</small>
+                        <div class="mt-2 progress" style="width: 200px; margin: 0 auto; height: 6px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" id="pdfLoadProgress" style="width: 0%"></div>
+                        </div>
+                        <small class="mt-1 text-white-50 d-block" id="pdfLoadPercent">0%</small>
                     </div>
                 `;
 
-                const pdf = await getCachedPdfDocument(pdfUrl);
+                const pdf = await getCachedPdfDocument(pdfUrl, (percent) => {
+                    const progressBar = document.getElementById('pdfLoadProgress');
+                    const percentText = document.getElementById('pdfLoadPercent');
+                    if (progressBar) progressBar.style.width = percent + '%';
+                    if (percentText) percentText.textContent = percent + '%';
+                });
 
                 if (controller.abort) return;
 
@@ -697,20 +753,40 @@
                     container.appendChild(pageWrapper);
                 }
 
-                // Render pages in batches of 3 for better performance
-                const batchSize = 3;
-                for (let i = fromPage; i <= toPage; i += batchSize) {
-                    if (controller.abort) return;
+                // Lazy load pages using IntersectionObserver for better performance
+                const pageObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const pageWrapper = entry.target;
+                            const pageNum = parseInt(pageWrapper.dataset.pageNum);
+                            if (!pageWrapper.dataset.rendered) {
+                                pageWrapper.dataset.rendered = 'true';
+                                renderPageInPlaceholder(pdf, pageNum, fromPage, container);
+                            }
+                            pageObserver.unobserve(pageWrapper);
+                        }
+                    });
+                }, {
+                    root: container,
+                    rootMargin: '200px', // Pre-load pages 200px before visible
+                    threshold: 0.1
+                });
 
-                    const batchEnd = Math.min(i + batchSize - 1, toPage);
-                    const batchPromises = [];
+                // Observe all page placeholders
+                container.querySelectorAll('.pdf-page-wrapper').forEach(wrapper => {
+                    pageObserver.observe(wrapper);
+                });
 
-                    for (let pageNum = i; pageNum <= batchEnd; pageNum++) {
-                        batchPromises.push(renderPageInPlaceholder(pdf, pageNum, fromPage, container));
+                // Render first 2 pages immediately for instant feedback
+                const initialPages = Math.min(2, toPage - fromPage + 1);
+                for (let i = 0; i < initialPages; i++) {
+                    const pageNum = fromPage + i;
+                    const wrapper = document.getElementById(`pdf-page-${pageNum}`);
+                    if (wrapper && !wrapper.dataset.rendered) {
+                        wrapper.dataset.rendered = 'true';
+                        pageObserver.unobserve(wrapper);
+                        await renderPageInPlaceholder(pdf, pageNum, fromPage, container);
                     }
-
-                    await Promise.all(batchPromises);
-                    renderedCount += (batchEnd - i + 1);
                 }
 
             } catch (error) {
@@ -749,10 +825,10 @@
                 canvas.style.cssText = 'max-width: 100%; display: block; margin: 0 auto;';
                 pageWrapper.appendChild(canvas);
 
-                // Calculate scale
+                // Calculate scale - use lower scale (max 1.0) for faster rendering
                 const containerWidth = container.clientWidth - 40;
                 const viewport = page.getViewport({ scale: 1 });
-                const scale = Math.min(containerWidth / viewport.width, 1.5);
+                const scale = Math.min(containerWidth / viewport.width, 1.0);
                 const scaledViewport = page.getViewport({ scale: scale });
 
                 canvas.height = scaledViewport.height;
@@ -767,6 +843,16 @@
 
             } catch (error) {
                 console.error(`Error rendering page ${pageNum}:`, error);
+                // Show error state
+                const pageWrapper = document.getElementById(`pdf-page-${pageNum}`);
+                if (pageWrapper) {
+                    pageWrapper.innerHTML = `
+                        <div class="mb-2 text-muted small">صفحة ${pageNum - fromPage + 1}</div>
+                        <div class="py-3 text-center text-danger">
+                            <i class="ti ti-alert-circle"></i> خطأ في تحميل الصفحة
+                        </div>
+                    `;
+                }
             }
         }
 
