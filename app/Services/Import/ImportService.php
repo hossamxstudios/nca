@@ -60,6 +60,7 @@ class ImportService
     private Collection $racksCache;
     private Collection $clientsCache;
     private Collection $landsCache;
+    private Collection $filesCache;
 
     // Batch buffers for bulk inserts
     private array $clientsToInsert = [];
@@ -69,6 +70,7 @@ class ImportService
     // Tracking
     private int $successCount = 0;
     private int $failedCount = 0;
+    private int $skippedCount = 0;
     private array $errors = [];
     private Import $import;
 
@@ -98,6 +100,7 @@ class ImportService
         $this->racksCache = collect();
         $this->clientsCache = collect();
         $this->landsCache = collect();
+        $this->filesCache = collect();
     }
 
     /**
@@ -126,6 +129,20 @@ class ImportService
         $this->clientsCache = Client::all()->keyBy('name');
         $this->landsCache = Land::all()->keyBy(fn($l) => $l->client_id . ':' . $l->land_no . ':' . ($l->governorate_id ?? 0));
 
+        // Preload existing files keyed by client_name:land_no:file_name.
+        // Using names (not IDs) avoids mismatches caused by duplicate client/land
+        // records where keyBy and firstOrCreate can resolve to different IDs.
+        $this->filesCache = DB::table('files')
+            ->join('clients', 'files.client_id', '=', 'clients.id')
+            ->join('lands', 'files.land_id', '=', 'lands.id')
+            ->whereNull('files.parent_id')
+            ->whereNull('files.deleted_at')
+            ->whereNull('clients.deleted_at')
+            ->whereNull('lands.deleted_at')
+            ->select('clients.name as client_name', 'lands.land_no', 'files.file_name')
+            ->get()
+            ->keyBy(fn($f) => trim($f->client_name) . ':' . trim($f->land_no) . ':' . trim($f->file_name));
+
         Log::info('[Import] Caches preloaded', [
             'governorates' => $this->governoratesCache->count(),
             'cities' => $this->citiesCache->count(),
@@ -138,6 +155,7 @@ class ImportService
             'racks' => $this->racksCache->count(),
             'clients' => $this->clientsCache->count(),
             'lands' => $this->landsCache->count(),
+            'files' => $this->filesCache->count(),
         ]);
     }
 
@@ -350,6 +368,17 @@ class ImportService
         $landNumbers = $this->parseLandNumbers($landNo);
 
         foreach ($landNumbers as $parsedLandNo) {
+            // Skip duplicate: same client name + land number + file name already exists.
+            // Key uses trimmed names to match how the cache was built.
+            $dedupeKey = trim($clientName) . ':' . trim($parsedLandNo) . ':' . trim($fileName);
+            if ($this->filesCache->has($dedupeKey)) {
+                $this->skippedCount++;
+                continue;
+            }
+
+            // Register immediately so duplicates within the same import batch are also caught.
+            $this->filesCache->put($dedupeKey, true);
+
             // Get or create land
             $land = $this->getOrCreateLand([
                 'client_id' => $client->id,
@@ -641,8 +670,8 @@ class ImportService
     }
 
     /**
-     * Create a file record.
-     * Uses batch insert buffer for efficiency.
+     * Buffer a file record for batch insert.
+     * Duplicate detection happens before this call in processArchiveRow().
      */
     private function createFile(array $data): void
     {
@@ -706,6 +735,7 @@ class ImportService
         return [
             'success' => $this->successCount,
             'failed' => $this->failedCount,
+            'skipped' => $this->skippedCount,
             'errors' => $this->errors,
         ];
     }
@@ -724,6 +754,9 @@ class ImportService
             'success_rows' => $this->successCount,
             'failed_rows' => $this->failedCount,
             'errors' => $this->errors,
+            'summary' => array_merge($this->import->summary ?? [], [
+                'skipped_rows' => $this->skippedCount,
+            ]),
         ]);
     }
 
@@ -743,6 +776,7 @@ class ImportService
         $this->racksCache = collect();
         $this->clientsCache = collect();
         $this->landsCache = collect();
+        $this->filesCache = collect();
 
         gc_collect_cycles();
     }

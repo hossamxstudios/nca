@@ -133,6 +133,14 @@
                                             <small class="text-muted">فشلت</small>
                                         </div>
                                     </div>
+                                    @if(($import->summary['skipped_rows'] ?? 0) > 0)
+                                    <div class="col-12 mt-2">
+                                        <div class="p-2 bg-warning-subtle rounded">
+                                            <h4 class="mb-0 text-warning">{{ number_format($import->summary['skipped_rows']) }}</h4>
+                                            <small class="text-muted">تم تخطيها (موجودة مسبقاً)</small>
+                                        </div>
+                                    </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
